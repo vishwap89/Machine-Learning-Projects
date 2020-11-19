@@ -1,0 +1,21 @@
+ 
+                                                                                                                                                                                                                                                                
+ 
+Variable Importance
+
+Obs    NAME                 LABEL                               NRULES    IMPORTANCE
+
+  1    Retweet_Count        Retweet Count                         34        1.00000 
+  2    Like_Count           Like Count                            45        0.75062 
+  3    TextCluster_SVD11                                           6        0.05269 
+  4    Character_Count      Character Count                        4        0.04376 
+  5    TextCluster_SVD7                                            4        0.03887 
+  6    TextTopic_raw9       ig,+fan,luka,+back,+winner             3        0.03656 
+  7    TextCluster_SVD4                                            2        0.03225 
+  8    TextCluster_SVD3                                            1        0.03179 
+  9    TextTopic_raw11      +time,first,zion,first time,+big       2        0.02927 
+ 10    TextCluster_SVD1                                            3        0.02901 
+ 11    TextCluster_SVD9                                            2        0.02683 
+ 12    TextTopic_raw4       +year,today,old,+sign,+deal            1        0.02369 
+ 13    TextCluster_SVD8                                            1        0.02043 
+ 14    TextCluster_SVD5                                            1        0.00938 

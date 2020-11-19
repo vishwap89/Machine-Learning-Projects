@@ -1,0 +1,48 @@
+ 
+                                                                                                                                                                                                                                                                
+ 
+ 
+Variable Summary
+
+        Measurement    Frequency
+Role       Level         Count
+
+TEXT      NOMINAL          1    
+ 
+                                                                                                                                                                                                                                                                
+ 
+ 
+
+The HPTMINE Procedure
+
+      Performance Information
+
+Execution Mode       Single-Machine
+Number of Threads    2             
+
+
+                  Data Access Information
+ 
+Data                          Engine    Role      Path
+
+EMWS1.TEXTPARSING_TRAIN       V9        Input     On Client
+EMWS1.TEXTPARSING_TMOUTPOS    V9        Output    On Client
+EMWS1.TEXTPARSING_TMOUT       V9        Output    On Client
+EMWS1.TEXTPARSING_TERMS       V9        Output    On Client
+EMWS1.TEXTPARSING_TMCONFIG    V9        Output    On Client
+
+
+                 Procedure Task Timing
+ 
+Task                                Seconds     Percent
+
+ Parse documents                       4.41     79.00% 
+ Index documents                       0.42      7.56% 
+ Output raw parsing results            0.02      0.29% 
+ Analyze terms                         0.28      5.11% 
+ Obtain term frequency                 0.27      4.84% 
+ Filter terms                          0.15      2.72% 
+ Generate term-document matrix         0.00      0.07% 
+ Output OUTCHILD table                 0.01      0.14% 
+ Output OUTTERMS table                 0.01      0.20% 
+ Output OUTCONFIG table                0.00      0.07% 

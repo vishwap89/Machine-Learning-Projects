@@ -1,0 +1,90 @@
+*------------------------------------------------------------*
+User:                vpc19001
+Date:                April 23, 2020
+Time:                10:57:22
+*------------------------------------------------------------*
+* Training Output
+*------------------------------------------------------------*
+ 
+ 
+ 
+ 
+Variable Summary
+ 
+          Measurement    Frequency
+Role         Level         Count
+ 
+ID         NOMINAL           1
+INPUT      INTERVAL          3
+INPUT      NOMINAL           2
+TARGET     INTERVAL          1
+TEXT       NOMINAL           1
+ 
+ 
+ 
+ 
+ 
+The CONTENTS Procedure
+ 
+Data Set Name        EMWS2.FIMPORT_DATA            Observations          5059
+Member Type          DATA                          Variables             8
+Engine               V9                            Indexes               0
+Created              04/23/2020 10:57:19           Observation Length    328
+Last Modified        04/23/2020 10:57:19           Deleted Observations  0
+Protection                                         Compressed            NO
+Data Set Type                                      Sorted                NO
+Label
+Data Representation  WINDOWS_64
+Encoding             wlatin1  Western (Windows)
+ 
+ 
+                                       Engine/Host Dependent Information
+ 
+Data Set Page Size          65536
+Number of Data Set Pages    26
+First Data Page             1
+Max Obs per Page            199
+Obs in First Data Page      193
+Number of Data Set Repairs  0
+ExtendObsCounter            YES
+Filename                    P:\Final Project\Twitter_Content_Engineering\Workspaces\EMWS2\fimport_data.sas7bdat
+Release Created             9.0401M3
+Host Created                X64_8PRO
+ 
+ 
+                  Alphabetic List of Variables and Attributes
+ 
+#    Variable            Type    Len    Format    Informat    Label
+ 
+2    Caption             Char    271    $271.     $271.
+3    Character_Count     Num       8                          Character Count
+4    Comments_Count      Num       8                          Comments Count
+8    Includes_Hashtag    Char      5                          Includes Hashtag
+5    Likes_Count         Num       8                          Likes Count
+7    Media_Type          Char      8                          Media Type
+6    Total_Actions       Num       8                          Total Actions
+1    UI_ID               Char     12    $12.      $12.
+
+
+*------------------------------------------------------------*
+* Score Output
+*------------------------------------------------------------*
+
+
+*------------------------------------------------------------*
+* Report Output
+*------------------------------------------------------------*
+ 
+ 
+ 
+ 
+Exported Attributes for TRAIN Port
+ 
+          Measurement    Frequency
+Role         Level         Count
+ 
+ID         NOMINAL           1
+INPUT      INTERVAL          3
+INPUT      NOMINAL           2
+TARGET     INTERVAL          1
+TEXT       NOMINAL           1

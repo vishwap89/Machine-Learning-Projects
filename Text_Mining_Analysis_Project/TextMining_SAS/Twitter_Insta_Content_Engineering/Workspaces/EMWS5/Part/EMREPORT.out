@@ -1,0 +1,36 @@
+ 
+                                                                                                                                                                                                                                                                
+ 
+ 
+Summary Statistics for Interval Targets
+
+Data=DATA
+
+                                                     Number of                 Standard
+  Variable       Maximum      Mean      Minimum    Observations    Missing    Deviation        Label
+
+Total_Actions     246465    13651.02       40          3848           1        17896.49    Total Actions
+
+
+Data=TEST
+
+                                                     Number of                 Standard
+  Variable       Maximum      Mean      Minimum    Observations    Missing    Deviation        Label
+
+Total_Actions     125669    12177.82       40           385           0        14342.12    Total Actions
+
+
+Data=TRAIN
+
+                                                     Number of                 Standard
+  Variable       Maximum      Mean      Minimum    Observations    Missing    Deviation        Label
+
+Total_Actions     187721    13480.50       48          2693           1        17054.36    Total Actions
+
+
+Data=VALIDATE
+
+                                                     Number of                 Standard
+  Variable       Maximum      Mean      Minimum    Observations    Missing    Deviation        Label
+
+Total_Actions     246465    14983.97      328           770           0        21872.45    Total Actions

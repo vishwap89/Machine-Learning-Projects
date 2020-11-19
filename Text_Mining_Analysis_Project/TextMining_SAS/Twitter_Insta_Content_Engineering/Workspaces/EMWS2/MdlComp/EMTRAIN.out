@@ -1,0 +1,91 @@
+ 
+                                                                                                                                                                                                                                                                
+ 
+ 
+Variable Summary
+
+          Measurement    Frequency
+ Role        Level         Count
+
+TARGET     INTERVAL          1    
+ 
+                                                                                                                                                                                                                                                                
+ 
+ 
+
+
+
+
+
+
+
+Fit Statistics
+Model Selection based on Valid: Average Squared Error (_VASE_)
+
+                                                 Valid:          Train:
+                                                Average         Average          Train:
+Selected    Model                               Squared         Squared    Misclassification
+ Model      Node      Model Description           Error           Error           Rate
+
+   Y        Reg       Regression                    0.0             0.0            .        
+            Neural    Neural Network       1959988134.3    2319192268.7            .        
+            Boost     Gradient Boosting    2590083059.6    4043818684.0            .        
+ 
+                                                                                                                                                                                                                                                                
+ 
+ 
+
+
+
+
+
+
+
+Fit Statistics Table
+Target: Total_Actions
+
+Data Role=Train
+
+Statistics                                                  Reg           Neural            Boost
+
+Train: Akaike's Information Criterion                -164671.44         87741.47              .  
+Train: Average Squared Error                               0.00    2319192268.73    4043818683.98
+Train: Average Error Function                              0.00    2319192268.73              .  
+Selection Criterion: Valid: Average Squared Error          0.00    1959988134.26    2590083059.58
+Train: Degrees of Freedom for Error                     3970.00          3812.00              .  
+Train: Model Degrees of Freedom                           77.00           235.00              .  
+Train: Total Degrees of Freedom                         4047.00          4047.00          4047.00
+Train: Divisor for ASE                                  4047.00          4047.00          4047.00
+Train: Error Function                                      0.00    9385771111546              .  
+Train: Final Prediction Error                              0.00    2605136750.97              .  
+Train: Maximum Absolute Error                              0.00        798883.06       1058187.69
+Train: Misclassification Rate                               .                .                .  
+Train: Mean Squared Error                                  0.00    2462164509.85              .  
+Train: Sum of Frequencies                               4047.00          4047.00          4047.00
+Train: Number of Estimated Weights                        77.00           235.00              .  
+Train: Root Average Squared Error                          0.00         48157.99         63591.03
+Train: Root Final Prediction Error                         0.00         51040.54              .  
+Train: Root Mean Squared Error                             0.00         49620.20              .  
+Train: Schwarz's Bayesian Criterion                  -164185.90         89223.32              .  
+Train: Sum of Squared Errors                               0.00    9385771111546    1.63653342E13
+Train: Sum of Case Weights Times Freq                   4047.00          4047.00          4047.00
+Train: Number of Wrong Classifications                      .                .                .  
+
+
+Data Role=Valid
+
+Statistics                                 Reg           Neural            Boost
+
+Valid: Average Squared Error                 0    1959988134.26    2590083059.58
+Valid: Average Error Function                0    1959988134.26              .  
+Valid: Divisor for VASE                   1012          1012.00          1012.00
+Valid: Error Function                        0    1983507991875              .  
+Valid: Maximum Absolute Error                0        294921.21        561257.95
+Valid: Misclassification Rate                .              .                .  
+Valid: Mean Squared Error                    0    1959988134.26              .  
+Valid: Sum of Frequencies                 1012          1012.00          1012.00
+Valid: Root Average Squared Error            0         44271.75         50892.86
+Valid: Root Mean Squared Error               0         44271.75              .  
+Valid: Sum of Squared Errors                 0    1983507991875    2621164056298
+Valid: Sum of Case Weights Times Freq     1012          1012.00          1012.00
+Valid: Number of Wrong Classifications       .              .                .  

@@ -1,0 +1,12 @@
+if NAME="Total_Actions" then do;
+ROLE="TARGET";
+LEVEL="INTERVAL";
+ORDER="";
+DROP="N";
+end;
+if NAME="Username" then do;
+ROLE="ID";
+LEVEL="NOMINAL";
+ORDER="";
+DROP="N";
+end;

@@ -1,0 +1,80 @@
+*------------------------------------------------------------*
+User:                yas19006
+Date:                May 06, 2020
+Time:                18:32:05
+*------------------------------------------------------------*
+* Training Output
+*------------------------------------------------------------*
+ 
+ 
+ 
+ 
+Variable Summary
+ 
+          Measurement    Frequency
+Role         Level         Count
+ 
+ID         NOMINAL           1
+INPUT      INTERVAL          3
+INPUT      NOMINAL           1
+TARGET     INTERVAL          1
+TEXT       NOMINAL           1
+ 
+ 
+ 
+ 
+Partition Summary
+ 
+                                     Number of
+Type             Data Set          Observations
+ 
+DATA        EMWS5.FIMPORT_train        3849
+TRAIN       EMWS5.Part_TRAIN           2694
+VALIDATE    EMWS5.Part_VALIDATE         770
+TEST        EMWS5.Part_TEST             385
+
+
+*------------------------------------------------------------*
+* Score Output
+*------------------------------------------------------------*
+
+
+*------------------------------------------------------------*
+* Report Output
+*------------------------------------------------------------*
+ 
+ 
+ 
+ 
+Summary Statistics for Interval Targets
+ 
+Data=DATA
+ 
+                                                     Number of                 Standard
+  Variable       Maximum      Mean      Minimum    Observations    Missing    Deviation        Label
+ 
+Total_Actions     246465    13651.02       40          3848           1        17896.49    Total Actions
+ 
+ 
+Data=TEST
+ 
+                                                     Number of                 Standard
+  Variable       Maximum      Mean      Minimum    Observations    Missing    Deviation        Label
+ 
+Total_Actions     125669    12177.82       40           385           0        14342.12    Total Actions
+ 
+ 
+Data=TRAIN
+ 
+                                                     Number of                 Standard
+  Variable       Maximum      Mean      Minimum    Observations    Missing    Deviation        Label
+ 
+Total_Actions     187721    13480.50       48          2693           1        17054.36    Total Actions
+ 
+ 
+Data=VALIDATE
+ 
+                                                     Number of                 Standard
+  Variable       Maximum      Mean      Minimum    Observations    Missing    Deviation        Label
+ 
+Total_Actions     246465    14983.97      328           770           0        21872.45    Total Actions

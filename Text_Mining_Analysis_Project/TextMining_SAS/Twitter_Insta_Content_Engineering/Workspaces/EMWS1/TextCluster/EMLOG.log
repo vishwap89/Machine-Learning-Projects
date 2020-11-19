@@ -1,0 +1,4660 @@
+*------------------------------------------------------------*
+User:                vpc19001
+Date:                April 23, 2020
+Time:                10:28:06
+Site:                70085622
+Platform:            X64_8PRO
+Maintenance Release: 9.04.01M3P062415
+EM Version:          14.1
+* 
+*------------------------------------------------------------*
+* Training Log
+Date:                April 23, 2020
+Time:                10:27:56
+*------------------------------------------------------------*
+14714  proc freq data=EMWS1.TextCluster_VariableSet noprint;
+14715  table ROLE*LEVEL/out=WORK.TextClusterMETA;
+14716  run;
+ 
+NOTE: There were 2 observations read from the data set EMWS1.TEXTCLUSTER_VARIABLESET.
+NOTE: The data set WORK.TEXTCLUSTERMETA has 2 observations and 4 variables.
+NOTE: PROCEDURE FREQ used (Total process time):
+      real time           0.06 seconds
+      cpu time            0.03 seconds
+ 
+ 
+14717  proc print data=WORK.TextClusterMETA label noobs;
+14718  var ROLE LEVEL COUNT;
+14719  label ROLE = "%sysfunc(sasmsg(sashelp.dmine, meta_role_vlabel, NOQUOTE))" LEVEL = "%sysfunc(sasmsg(sashelp.dmine, meta_level_vlabel, NOQUOTE))" COUNT = "%sysfunc(sasmsg(sashelp.dmine, rpt_count_vlabel, NOQUOTE))";
+14720  title9 ' ';
+14721  title10 "%sysfunc(sasmsg(sashelp.dmine, rpt_varSummary_title  , NOQUOTE))";
+14722  run;
+ 
+NOTE: There were 2 observations read from the data set WORK.TEXTCLUSTERMETA.
+NOTE: The PROCEDURE PRINT printed page 1.
+NOTE: PROCEDURE PRINT used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+ 
+ 
+14723  title10;
+ 
+14724  %let EMEXCEPTIONSTRING=;
+PERFORMANCE  DETAILS
+15051  *------------------------------------------------------------*;
+15052  * TextCluster: Generation of macros and macro variables;
+15053  * To see the code generated, set the EM_DEBUG macro variable to SOURCE or _ALL_;
+15054  *------------------------------------------------------------*;
+ 
+15055  %let EMEXCEPTIONSTRING=;
+15056  *------------------------------------------------------------*;
+15057  * TRAIN: TextCluster;
+15058  *------------------------------------------------------------*;
+15059  %let EM_ACTION = TRAIN;
+15060  %let syscc = 0;
+15061  %macro main();
+15062
+15063     %if %upcase(&EM_ACTION) eq CREATE %then %do;
+15064        filename temp catalog 'sashelp.emtxtext.cluster_create.source';
+15065        %include temp;
+15066        %create();
+15067     %end;
+15068     %if %upcase(&EM_ACTION) eq TRAIN %then %do;
+15069        filename temp catalog 'sashelp.emtxtext.cluster_train.source';
+15070        %include temp;
+15071        %train();
+15072     %end;
+15073     %if %upcase(&EM_ACTION) eq REPORT %then %do;
+15074        filename temp catalog 'sashelp.emtxtext.cluster_report.source';
+15075        %include temp;
+15076        %report();
+15077     %end;
+15078     %if %upcase(&EM_ACTION) eq SCORE %then %do;
+15079        filename temp catalog 'sashelp.emtxtext.cluster_score.source';
+15080        %include temp;
+15081        %score();
+15082     %end;
+15083  %mend main;
+15084
+15085  %main();
+NOTE: %INCLUDE (level 1) file TEMP is file SASHELP.EMTXTEXT.CLUSTER_TRAIN.SOURCE.
+15086 +%macro train();
+15087 +
+15088 +    %global last_parse_node last_filter_node last_prescore_node server_err
+15089 +      parsevar EM_SASMSG;
+15090 +    %if ^%symexist(tm_debug) %then %let tm_debug=0;
+15091 +    %let EM_SASMSG=TMINE;
+15092 +    %let syscc=0;
+15093 +
+15094 +    filename temp catalog 'sashelp.emtxtext.tm_get_last_filter.source';
+15095 +    %include temp;
+15096 +    filename temp catalog 'sashelp.emtxtext.tm_cluster.source';
+15097 +    %include temp;
+15098 +    filename temp catalog 'sashelp.emtxtext.tm_apply_tmutil.source';
+15099 +    %include temp;
+15100 +    filename temp catalog 'sashelp.emtxtext.tm_svd_do_samp.source';
+15101 +    %include temp;
+15102 +    filename temp;
+15103 +
+15104 +    %tm_get_last_filter(eminfo=&EM_IMPORT_DATA_EMINFO,em_lib=&em_lib,
+15105 +                        em_variableset=&em_data_variableset);
+15106 +    %if &EMEXCEPTIONSTRING ne %then %goto end_cluster_train;
+15107 +    %let lastparsenode=&last_parse_node;
+15108 +    %let lastfilternode=&last_filter_node;
+15109 +    %let lastprescore=&last_prescore_node;
+15110 +    %if &lastfilternode=&lastparsenode %then %do;
+15111 +        %let EMEXCEPTIONSTRING = EMTOOL.NOFILTERNODE;
+15112 +        %goto end_cluster_train;
+15113 +    %end;
+15114 +
+15115 +    /*populate last tm node dataset so tm_get_last_filter is not called in score*/
+15116 +    %em_getname(key=last_tm_nodes, type=data);
+15117 +    data &em_user_last_tm_nodes;
+15118 +        set &EM_IMPORT_DATA_EMINFO;
+15119 +    run;
+15120 +
+15121 +
+15122 +    %em_getname(key=tmconfig, type=data);
+15123 +    %em_getname(key=terms, type=data);
+15124 +    %em_getname(key=docs, type=data);
+15125 +    %em_getname(key=clusters, type=data);
+15126 +    %em_getname(key=graph_table, type=data);
+15127 +    %em_getname(key=svd_u, type=data);
+15128 +    %em_getname(key=tmconfig, type=data);
+15129 +    %em_getname(key=svd_s, type=data);
+15130 +    %em_getname(key=emoutstat, type=data);
+15131 +    %em_getname(key=hierds, type=data);
+15132 +
+15133 +
+15134 +
+15135 +    /* get target variable info */
+15136 +    %let targetvar = ;
+15137 +    data _null_;
+15138 +       set &em_data_variableset(where=(ROLE='TARGET' and USE in('Y' 'D')
+15139 +                                       and LEVEL ne 'INTERVAL'));
+15140 +       if _N_=1 then call symput('targetvar', strip(NAME));
+15141 +    run;
+15142 +
+15143 +
+15144 +
+15145 +    /* set up terms strings and initial config table */
+15146 +    proc sql noprint;
+15147 +      create table &EM_USER_tmconfig as
+15148 +         select *
+15149 +         from &EM_LIB..&last_filter_node._tmconfig;
+15150 +    quit;
+15151 +
+15152 +
+15153 +    proc sql noprint;
+15154 +       select  cellwgt into: _cellweight
+15155 +       from &em_user_tmconfig;
+15156 +       select termwgt into: _termwgt
+15157 +       from &em_user_tmconfig;
+15158 +    quit;
+15159 +
+15160 +    data _keepdocs (keep=_DOCUMENT_ %if &targetvar ne %then &targetvar; );
+15161 +        set &EM_IMPORT_DATA;
+15162 +    run;
+15163 +
+15164 +    %tm_apply_tmutil(data=&EM_LIB..&last_filter_node._tmout,
+15165 +                       terms=&EM_LIB..&last_filter_node._terms,
+15166 +                       docs=&EM_IMPORT_DATA,
+15167 +                       keepdocs=_keepdocs,
+15168 +                       reduceF=2,
+15169 +                       termweight=&_termwgt,
+15170 +                       cellweight=&_cellweight,
+15171 +                       outdata=_outtmutil_,
+15172 +                       outterms=_newkey,
+15173 +                       outweights=_weights,
+15174 +                       targetvar=&targetvar,
+15175 +                       memloc=_tmmem);
+15176 +
+15177 +                       /* get the svd dimensions on the documents */
+15178 +    %tm_svd_do_samp(data=_outtmutil_,docs=_keepdocs, maxK=&em_property_maxK, res=&em_property_resolution,cellwgt=&_cellweight,in_global=_weights,
+15179 +                     rowVar=_termnum_,colVar=_document_,entryVar=_count_,u=&EM_USER_SVD_U,v=_svdv,s=&EM_USER_svd_S,
+15180 +                     colpro=_svdcolpro,rowpro=_svdrowpro, normcol=normcol, normrow=normrow,prefix=&EM_NODEID);
+15181 +
+15182 +    %if(&syscc >4 ) %then %do;
+15183 +        %goto end_cluster_train;
+15184 +    %end;
+15185 +
+15186 +    proc sql noprint;
+15187 +       create table &EM_USER_TERMS(drop=index) as
+15188 +       select a.*,b.*
+15189 +       from &EM_LIB..&last_filter_node._terms a left join _svdrowpro b
+15190 +       on a.key = b.index;
+15191 +    quit;
+15192 +
+15193 +    %tm_cluster(data=&EM_LIB..&last_filter_node._tmout,
+15194 +        terms=&EM_LIB..&last_filter_node._terms,
+15195 +        docs=&EM_IMPORT_DATA,
+15196 +        svdColPro=_svdcolpro,
+15197 +        maxNumTerms=&em_property_ndescterms,
+15198 +        numClus=&em_property_nclusters,
+15199 +        numType=&em_property_exactormaximum,
+15200 +        algorithm=&em_property_algorithm,
+15201 +        outdocs=&EM_USER_DOCS,
+15202 +        outclusters=&EM_USER_CLUSTERS,
+15203 +        hierds=&EM_USER_HIERDS,
+15204 +        emoutstat=&EM_USER_emoutstat,
+15205 +        prefixstring= &EM_NODEID);
+15206 +
+15207 +    %if &emexceptionstring ne %then %goto end_cluster_train;
+15208 +
+15209 +    %if &em_property_algorithm=2.0 %then %do;
+15210 +
+15211 +        data &em_user_hierds(drop=plus);
+15212 +            set &em_user_hierds;
+15213 +            plus='';
+15214 +            if substr(CLUS_DESC, 1, 1) = "+" then plus="+ ";
+15215 +            graphdesc=_CLUSTER_ || ': ' || plus || scan(CLUS_DESC, 1);
+15216 +        run;
+15217 +    %end;
+15218 +
+15219 +
+15220 +    * add the info to EMINFO to forward on to other nodes ;
+15221 +   data &EM_DATA_EMINFO;
+15222 +      length TARGET KEY $32 DATA $43;
+15223 +
+15224 +      key="LastTMNode";
+15225 +      data="&EM_NODEID";
+15226 +      output;
+15227 +
+15228 +      key="LastTMNodeType";
+15229 +      data="TextCluster";
+15230 +      output;
+15231 +
+15232 +      key="LastTextCluster";
+15233 +      data="&EM_NODEID";
+15234 +      output;
+15235 +
+15236 +      key="PRESCORECODE";
+15237 +      data="&EM_NODEID";
+15238 +      output;
+15239 +   run;
+15240 +
+15241 +    proc sql noprint;
+15242 +        select count(*) into :svdkeep
+15243 +            from &em_user_svd_s
+15244 +            where keep=1;
+15245 +        select count(*) into :cluscnt
+15246 +            from &em_user_clusters;
+15247 +    quit;
+15248 +   data &EM_USER_tmconfig;
+15249 +         set &EM_USER_TMCONFIG;
+15250 +         clus_alg = "&em_property_algorithm";
+15251 +         maxsvd = &em_property_maxk;
+15252 +         svdkeep=&svdkeep;
+15253 +         last_prescore = "&last_prescore_node";
+15254 +      run;
+15255 +
+15256 +    %em_metachange(name=&EM_NODEID._CLUSTER_, role=SEGMENT, level=NOMINAL);
+15257 +    %do i=1 %to &svdkeep;
+15258 +         %em_metachange(name=&EM_NODEID._SVD&i, role=INPUT, level=INTERVAL);
+15259 +    %end;
+15260 +    %do i=1 %to &cluscnt;
+15261 +         %em_metachange(name=&EM_NODEID._PROB&i, role=REJECTED);
+15262 +    %end;
+15263 +
+15264 +%end_cluster_train:
+15265 +    filename temp;
+15266 +    %if &tm_debug =0 %then %do;
+15267 +        proc sql noprint;
+15268 +              drop table _svdcolpro;
+15269 +              drop table _svdrowpro;
+15270 +              drop table _newkey ;
+15271 +              drop table _keepdocs ;
+15272 +        quit;
+15273 +    %end;
+15274 +
+15275 +%mend train;
+15276 +
+NOTE: %INCLUDE (level 1) ending.
+NOTE: %INCLUDE (level 1) file TEMP is file SASHELP.EMTXTEXT.TM_GET_LAST_FILTER.SOURCE.
+15277 +/* ****************************************************************
+15278 + * Copyright (C) 2009 by SAS Institute Inc., Cary, NC 27513
+15279 + *
+15280 + * Name:             tm_get_last_filter.sas
+15281 + * Product:          SAS Text Miner
+15282 + * Language:         Sas
+15283 + * Script:
+15284 + *
+15285 + * Usage:
+15286 + *
+15287 + * Purpose:  macro to get the last filter node and the last parse node in the
+15288 + *   diagram that corresponds to the current parse variable.  If there is no filter
+15289 + *   node, the filter node is set to the last parse node.
+15290 + *
+15291 + *
+15292 + *
+15293 + * History:
+15294 + * 14Aug09 Initial Coding
+15295 + *
+15296 + * Notes:
+15297 + *    Returns an error in the following cases:
+15298 + *      1. There is no preceding parse node.
+15299 + *      2. There is no parse node with the current parse variable.
+15300 + *
+15301 + * Last Modified By:
+15302 + * Last Modified On: Wed Sep 23 15:35:04 2009
+15303 + *
+15304 + * End
+15305 + * ************************************************************** */
+15306 +%macro tm_get_last_filter(eminfo=,em_lib=, em_variableset=);
+15307 +   %let last_parse_node=;
+15308 +   %let last_filter_node=;
+15309 +   %let last_prescore_node=;
+15310 +   %let server_err=;
+15311 +   %let EMEXCEPTIONSTRING=;
+15312 +   %let syscc=0;
+15313 +
+15314 +    /* verify that setinit for SAS Text Miner is currently active */
+15315 +    %if %sysfunc(sysprod(PRODNUM107)) ne 1 %then %do;
+15316 +       %let EMEXCEPTIONSTRING = EMTOOL.NOTMLICENSE;
+15317 +        %goto end_macro;
+15318 +        %end;
+15319 +
+15320 +
+15321 +    * find last filter or text parse node if no filter node. ;
+15322 +   %if %sysfunc(exist(&eminfo)) %then %do;
+15323 +      proc sql noprint;
+15324 +      select data into :last_parse_node from &eminfo where key="LastTextParsing";
+15325 +         select data into :last_filter_node from &eminfo where key="LastTextFilter";
+15326 +         select data into :last_prescore_node from &eminfo where kupcase(key)="PRESCORECODE";
+15327 +      quit;
+15328 +
+15329 +   %end;
+15330 +
+15331 +   %if &last_parse_node= %then %do;
+15332 +      %let EMEXCEPTIONSTRING = EMTOOL.NOPARSINGNODE;
+15333 +      %goto end_macro;
+15334 +      %end;
+15335 +
+15336 +   %else %if &last_filter_node= %then %let last_filter_node = %ktrim(&last_parse_node);
+15337 +   %else %let last_filter_node = %ktrim(&last_filter_node);
+15338 +   %let last_parse_node = %ktrim(&last_parse_node);
+15339 +
+15340 +   * Check to make sure parse variable is present and still exists;
+15341 +   %let parsevar = ;
+15342 +   proc sql noprint;
+15343 +    select parsevar into :parsevar
+15344 +    from &em_lib..&last_filter_node._tmconfig;
+15345 +    quit;
+15346 +
+15347 +    *check for dropped parsevar on input dataset;
+15348 +       %let parsevarOK= ;
+15349 +       %let parsevarN=%kupcase(%ktrim(&parsevar));
+15350 +       data _null_;
+15351 +         set &em_variableset(where=(kupcase(NAME)="&parsevarN" and USE in('Y' 'D')));
+15352 +         if (ROLE='TEXT' or ROLE='TEXTLOC') then call symput('parsevarOK', strip(ROLE));
+15353 +         run;
+15354 +       %if(&parsevarOK eq ) %then %do;
+15355 +          %let EMEXCEPTIONSTRING = EMTOOL.NOPARSINGVAR;
+15356 +          %goto end_macro;
+15357 +          %end;
+15358 +%end_macro:
+15359 +
+15360 +%mend tm_get_last_filter;
+NOTE: %INCLUDE (level 1) ending.
+NOTE: %INCLUDE (level 1) file TEMP is file SASHELP.EMTXTEXT.TM_CLUSTER.SOURCE.
+15362 +   /* ****************************************************************
+15363 + * Copyright (C) 2009 by SAS Institute Inc., Cary, NC 27513
+15364 + *
+15365 + * Name:             tm_cluster.sas
+15366 + * Support:          rualbr Russell Albright
+15367 + * Product:
+15368 + * Language:         Sas
+15369 + * Script:
+15370 + *
+15371 + * Usage:
+15373 + !Inputs into %tm_train_cluster
+15374 + * doc = doc datset from a tm node
+15375 + * data =  out datset from a tm node
+15376 + * terms = terms dataset from  tm node
+15377 + * svdcolpro = column projections data set
+15378 + * cellweight setting
+15379 + * termweight setting
+15380 + * maxSvddim = Maximum number of dimension to calculate
+15381 + * svdres= <HIGH, MED, or LOW>
+15382 + * maxNumTerms - maximum number of term to use for descriptive terms
+15383 + * numClus = number of clusters to use
+15384 + * numType=<MAXIMUM or EXACT> Max means that <= maximum will actually be used.
+15385 + * threads = the number of threads you would like emclus to use
+15388 + !Outputs from %tm_train_cluster
+15389 + * outdocs - a doc table with the cluster restults on it.
+15390 + * outclusters- an output cluster table with the descriptive terms on it (future story)
+15391 + *
+15392 + * Example call
+15393 + *
+15394 + *%tm_cluster(data=tmn.text_out_t,
+15395 + *             terms=tmn.terms,
+15396 + *             docs=testdata._train,
+15397 + *             svdcolpro=tmn._svdcolpro,
+15398 + *             maxNumTerms=5,
+15399 + *             numClus=40,
+15400 + *             numType=MAXIMUM,
+15401 + *             outdocs=docsresult,
+15402 + *             hierds=_hierds,
+15403 + *             emoutstat=_emoutstat,
+15404 + *             outclusters= clusterResult);
+15405 + *
+15406 + *
+15407 + * Purpose: Perform the clustering on out,term, doc from parse or filter node
+15408 + *
+15409 + * History:
+15410 + *
+15411 + *
+15412 + * Notes:
+15413 + *
+15414 + * Last Modified By:
+15415 + * Last Modified On: Thu Jan 08 17:22:43 2009
+15416 + *
+15417 + * End
+15418 + * ************************************************************** */
+15420 +%macro tm_cluster(data=,
+15421 +                     terms=,
+15422 +                     docs=,
+15423 +                     svdColPro=,
+15424 +                     maxNumTerms=,
+15425 +                     numClus=,
+15426 +                     numType=MAXIMUM,
+15427 +                     algorithm=,
+15428 +                     outdocs=,
+15429 +                     hierds=_hierds,
+15430 +                     emoutstat=_emoutstat,
+15431 +                     outclusters=,
+15432 +                     prefixString=,
+15433 +                     threads=);
+15436 +    %local _cleanedout ;
+15437 +    %local _numRepDocs;
+15438 +    %global systmutil;
+15439 +    %let systmutil = ;
+15440 +    %if ^%symexist(tm_debug) %then %let tm_debug=0;
+15442 +    filename temp catalog 'sashelp.emtext.tmgetncl.source';
+15443 +    %include temp;
+15444 +    filename temp catalog 'sashelp.emtext.tmfast.source';
+15445 +    %include temp;
+15447 +    filename temp catalog 'sashelp.emtext.tmemclus.source';
+15448 +    %include temp;
+15450 +    filename temp catalog 'sashelp.emtext.tmpred.source';
+15451 +    %include temp;
+15453 +    filename temp catalog 'sashelp.emtext.tmsort.source';
+15454 +    %include temp;
+15456 +    %let tmdata=&data;
+15457 +    %let tmterms=&terms;
+15458 +    %let tmdocs=&docs;
+15459 +    %let emexceptionstring=;
+15462 +    /* check some basic size requirements to proceed.*/
+15463 +    proc sql noprint;
+15464 +       select count(*) into: numTerms
+15465 +       from &terms a
+15466 +       where a.numdocs>=2 and _ispar in('+',' ')
+15467 +       ;
+15468 +       select count (*) into: numdocs
+15469 +       from &docs a;
+15470 +    quit;
+15472 +    %if (&numterms < 10)  OR (&numdocs< 8) %then %do;
+15473 +        %let emexceptionstring=EMTOOL.INSUFFICIENTDATA;
+15474 +        %goto end_train_cluster;
+15475 +    %end;
+15477 +    /* Get number of kept svd variables */
+15478 +    %let pid = %sysfunc(open(&svdcolpro));
+15479 +    %let svdkeep=%eval(%sysfunc(attrn(&pid,nvars))-1);
+15480 +    %let rc = %sysfunc(close(&pid));
+15483 +   /************************ Find clusters *************************************/
+15485 +   %if %upcase(&numType) = MAXIMUM %then %do;   /* numClus = MAXIMUM */
+15487 +      /* Call tmgetncl to find the recommended number of clusters. */
+15489 +      %tmGetNcl(data=&svdcolpro,
+15490 +               maxclusters=&numClus,
+15491 +               vars=%str(&prefixstring._SVD1 - &prefixstring._SVD&svdkeep),
+15492 +               tempDS=_clusTemp1,
+15493 +               clusDS=_clusTemp,
+15494 +               threads=
+15495 +            );
+15497 +      /* error returned in above macro */
+15498 +      %if (&syscc >4 ) %then %do;
+15499 +         %let emexceptionstring= &SYSERRORTEXT;
+15500 +         %goto end_train_cluster;
+15501 +      %end;
+15503 +      /* Store the recommended number into a macro variable. */
+15505 +      proc sql noprint;
+15506 +         select max(nclus) into: numClus
+15507 +         from _clusTemp
+15508 +         ;
+15509 +      quit;
+15512 +      %if not (&numClus > 1) %then %do;
+15513 +        %let numClus = 2;
+15514 +      %end;
+15517 +       %if &tm_debug =0  %then %do;
+15518 +          proc sql nowarn noprint;
+15519 +              drop table _clustemp;
+15520 +              drop table _clustemp1;
+15521 +           quit;
+15522 +       %end;
+15524 +   %end;  /* &numtype = MAXIMUM */
+15526 +   %else  %do;
+15527 +       %let numClus = %left(&numClus);/*&numtype=EXACT*/
+15528 +   %end;
+15530 +    proc sql noprint;
+15531 +        select count(*) into: nobs
+15532 +        from &svdcolpro;
+15533 +    quit;
+15535 +   %if %left(&algorithm)=2.0 %then %do; /* Hierarchical clustering */
+15536 +        filename temp catalog 'sashelp.emtxtext.tmgethclus.source';
+15537 +        %include temp;
+15539 +        filename temp catalog 'sashelp.emtext.tmhclus.source';
+15540 +        %include temp;
+15541 +        filename temp catalog 'sashelp.emtext.tmtree.source';
+15542 +        %include temp;
+15544 +        %if &nobs < &numClus and  %upcase(&numType) = EXACT %then %do;
+15545 +            %let emexceptionstring=EMTOOL.TOOFEWOBSTOCLUS;
+15546 +            %goto end_train_cluster;
+15547 +        %end;
+15549 +        %tmgethclus(outtree=_outtree,
+15550 +                    idvar=index,
+15551 +                    inDS=&svdcolpro,
+15552 +                    outDS=&outdocs,
+15553 +                    fastOut=_fastclusstat,
+15554 +                    textClusDS=_clusstat,
+15555 +                    vars=%str(&prefixstring._SVD1 - &prefixstring._SVD&svdkeep),
+15556 +                    nobs=&nobs,
+15557 +                    nclus=&numClus,
+15558 +                    hierds=&hierds,
+15559 +                    svdkeep=&svdkeep,
+15560 +                    prefix=&prefixString);
+15561 +        %if &EMEXCEPTIONSTRING ne %then %goto end_train_cluster;
+15563 +        data _clusstat;
+15564 +            set _clusstat(rename=(&prefixstring._SVD1 - &prefixstring._SVD&svdkeep.=_mean1-_mean&svdkeep.));
+15565 +        run;
+15567 +        data _clustermean;
+15568 +          set _clusstat(keep=_cluster_ _mean1-_mean&svdkeep. rename=(_cluster_=cluster));
+15569 +        run;
+15571 +        proc sql noprint;
+15572 +            drop table _outtree;
+15573 +        quit;
+15574 +   %end;
+15575 +   %else %do; /* Expectation-maximization */
+15576 +       /* Call %anl_tmfast to create cluster stat data set that will be used as an input for %anl_tmemclus. */
+15577 +          %tmFast(data=&svdcolpro,
+15578 +             clusters=&numClus,
+15579 +             outstat=_fastclusstat,
+15580 +             outseed=,
+15581 +                id=,
+15582 +             out=,
+15583 +             vars=%str(&prefixstring._SVD1 - &prefixstring._SVD&svdkeep)
+15584 +             );
+15585 +          run;
+15587 +          /* If some of the clusters are too small (frequency less than 5) and &g_numClusFlag=MAXIMUM, */
+15588 +          /* reassign value for &cluster macro var from WORK.&s_reportID._fastclusstat data set. */
+15590 +       %if %upcase(&numType) = MAXIMUM %then
+15591 +       %do;   /* &ClusType = MAXIMUM */
+15593 +          proc sql noprint;
+15594 +             select max(CLUSTER) into :numClus
+15595 +             from _fastclusstat
+15596 +             where upcase(_TYPE_)='SEED'
+15597 +             ;
+15598 +          quit;
+15600 +          %let numClus = %left(&numClus);
+15602 +       %end;  /* &ClusType = MAXIMUM */
+15603 +       %else %do; /* &ClusType = EXACT */
+15604 +          %if &nobs < &numClus %then %do;
+15605 +            %let emexceptionstring=EMTOOL.TOOFEWOBSTOCLUS;
+15606 +            %goto end_train_cluster;
+15607 +          %end;
+15608 +       %end;
+15610 +       %tmEMClus(data=&svdcolpro,
+15611 +                role=TRAIN,
+15612 +                clusters=&numClus,
+15613 +                seed=_fastclusstat,
+15614 +                outstat=&emoutstat,
+15615 +                out=_tmutildoc,
+15616 +                vars=%str(&prefixstring._SVD1 - &prefixstring._SVD&svdkeep),
+15617 +                cov=,
+15618 +                iter=5,
+15619 +                secclus=,
+15620 +                seciter=,
+15621 +                min=,
+15622 +                method=,
+15623 +                eps=.1,
+15624 +                init=FASTCLUS,
+15625 +                print=NONE,
+15626 +                p=,
+15627 +                outliers=,
+15628 +                decvar=0,
+15629 +                initstd=,
+15630 +                dist=,
+15631 +                secstd=,
+15632 +                nobs=,
+15633 +                threads=&threads.
+15634 +             );
+15635 +       run;
+15638 +       /* Run %anl_tmpred macro to assign documents to clusters with the largest posterior probability */
+15639 +       /* and to calculate cluster frequency. */
+15641 +       %tmPred (inds=_tmutildoc,
+15642 +                outds=&outdocs,
+15643 +              clusters=&numClus,
+15644 +              type=max,
+15645 +              freqds=_clusstat,
+15646 +              compress=1
+15647 +              );
+15648 +        data &outdocs;
+15649 +           set &outdocs;
+15650 +           rename prob1-prob&numClus = &prefixString._prob1-&prefixString._prob&numclus;
+15651 +        run;
+15655 +       /* Transpose the output data set to contain cluster ID and cluster frequency. */
+15657 +        data _clusstat;
+15658 +            array c(&numClus) _c1-_c&numClus;
+15659 +            set _clusstat;
+15660 +            /*keep _CLUSTER_ Freq;*/
+15661 +            totalobs=0;
+15662 +            do _CLUSTER_ = 1 to &numClus;
+15663 +                Freq = c(_CLUSTER_);
+15664 +                totalobs=totalobs+c(_CLUSTER_);
+15665 +                output;
+15666 +            end;
+15667 +            call symput ('totNumDocs', totalobs);
+15668 +        run;
+15670 +       %if &totNumDocs = 0 %then
+15671 +       %do;   /*&totNumDocs = 0 */
+15672 +           goto end_train_cluster;
+15673 +       %end; /*&totNumDocs = 0 */
+15675 +       /* Calculate cluster percentage. */
+15676 +       data _clusstat;
+15677 +          set _clusstat;
+15678 +          Percent = Freq/&totNumDocs;
+15679 +       run;
+15681 +       data _clustermean(rename=(&prefixstring._SVD1 - &prefixstring._SVD&svdkeep. = _mean1-_mean&svdkeep.));
+15682 +          set &emoutstat(keep=cluster _TYPE_ &prefixstring._SVD1 - &prefixstring._SVD&svdkeep.);
+15683 +          if _TYPE_ = "MEAN";
+15684 +            keep cluster &prefixstring._SVD1 - &prefixstring._SVD&svdkeep. ;
+15685 +      run;
+15686 +  %end;
+15688 +      proc sql;
+15689 +      create table _meandocs(drop=cluster) as
+15690 +      select a.*, b.*
+15691 +      from &outdocs a left join _clustermean b
+15692 +      on a._cluster_=b.cluster
+15693 +      ;
+15694 +      quit;
+15695 +       /*calulate residual for each doc */
+15696 +      data _rmscalc;
+15697 +          merge _meandocs(in=inhere) _clusstat;
+15698 +          array _means(&svdkeep) _mean1-_mean&svdkeep.;
+15699 +          array _svds(&svdkeep) &prefixstring._SVD1 - &prefixstring._SVD&svdkeep.;
+15700 +          by _cluster_;
+15701 +          error=0;
+15702 +          do i = 1 to &svdkeep;
+15703 +             error +( (_svds{i}-_means{i}) * (_svds{i}-_means{i}));
+15704 +          end;
+15705 +         /*error=sqrt(error);*/
+15706 +          drop i;
+15707 +       run;
+15708 +    /*calc standardized residual for clusters*/
+15709 +       proc summary data=_rmscalc nway;
+15710 +          class _cluster_;
+15711 +          var error;
+15712 +          output out=_meanerr mean=meane sum=sume;
+15713 +       run;
+15715 +       data _rmsse;
+15716 +          set _meanerr;
+15717 +          /* original code divides by number of svd dims*/
+15718 +          if _freq_ gt 1 then do;
+15719 +              _rmsstd_=sqrt(sume/((_freq_-1)*(&svdkeep.)));
+15720 +          end;
+15721 +          else do;
+15722 +              _rmsstd_=0;
+15723 +          end;
+15724 +          keep _cluster_  _rmsstd_;
+15725 +       run;
+15728 +       proc sql;
+15729 +           create table _clusstat2(drop=cluster) as
+15730 +           select a.*,b.*
+15731 +           from _clustermean a left join _rmsse b
+15732 +           on a.cluster=b._cluster_;
+15734 +           create table &outclusters as
+15735 +           select  a.*, b.freq, b.percent
+15736 +           from _clusstat2(keep=_cluster_ %str(_mean1-_mean&svdkeep) _rmsstd_) a right join _clusstat b
+15737 +           on a._cluster_=b._cluster_
+15738 +           where b.freq>0 ;
+15739 +       quit;
+15742 +    filename temp catalog 'sashelp.emtext.tmterm1.source';
+15743 +    %include temp / nosource2;
+15745 +   /****************** Find descriptive terms for clusters ***************************/
+15748 +   /* Add _term_ variable to WORK._terms data set to prepare it as an
+15749 +   /* input to %tmterm1 macro. The variable is added from &EM_LIB..&last_filter_node._terms data set. */
+15751 +   proc sort data=&tmterms out=_terms_;
+15752 +        by key _ispar;
+15753 +   run;
+15755 +   data _terms_;
+15756 +       set _terms_;
+15757 +       by key _ispar;
+15758 +       if first.key then
+15759 +          output;
+15760 +       else;
+15761 +   run;
+15763 +    /* Concatenate + to terms */
+15764 +    data _terms_;
+15765 +        set _terms_;
+15766 +        if _ispar='+' then
+15767 +            Term=_ispar || ' ' || term;
+15768 +    run;
+15770 +   %tmsort(data=&tmdata,
+15771 +         out=_tmout_,
+15772 +         by=_termnum_,
+15773 +            options=,
+15774 +         threads=threads);
+15777 +   data _tmout_;
+15778 +      merge _tmout_ (in=_A_)
+15779 +            _terms_ (rename=(key=_termnum_ term=_term_) keep=key term );
+15780 +      by _termnum_;
+15781 +      if _A_;
+15782 +   run;
+15784 +   /* Create _segmnt_ variable in WORK._docs data set to prepare it to be an */
+15785 +   /* input to %tmterm1 macro. Set it equal to _cluster_ variable. */
+15787 +   %if &algorithm=2.0 %then %do;
+15788 +        data _docs_;
+15789 +            set &outdocs (rename=(index=_document_) keep=index _cluster_ _finalcluster_);
+15790 +            _SEGMNT_=_finalcluster_;
+15791 +        run;
+15792 +        proc sql noprint;
+15793 +            select max(_cluster_) into :numclus from &outclusters;
+15794 +        quit;
+15795 +   %end;
+15796 +   %else %do;
+15797 +       data _docs_;
+15798 +        set &outdocs (rename=(index=_document_) keep=index _cluster_);
+15799 +         _SEGMNT_=_cluster_;;
+15800 +       run;
+15802 +   %end;
+15804 +   /* Run %tmterm1 macro to determine descriptive terms for clusters. */
+15805 +   %tmterm1(DSN_TPARS=_tmout_,
+15806 +        DSN_CLUS=_docs_,
+15807 +        DSN_DESC=_desc_,
+15808 +        N_DESC_TERMS=&maxnumterms,
+15809 +        N_CLUS=&numclus,
+15810 +        top_freq=%eval(&maxnumterms*2),
+15811 +        key=);
+15813 +    /* Add cluster descriptive terms to clusters table. */
+15814 +   %tmsort(data=&outclusters,
+15815 +         out=&outclusters,
+15816 +         by=_cluster_,
+15817 +            options=,
+15818 +         threads=threads);
+15820 +   %tmsort(data=_desc_,
+15821 +         out=_desc_,
+15822 +         by=_cluster_,
+15823 +            options=,
+15824 +         threads=threads);
+15826 +   data _desc_;
+15827 +      merge &outclusters _desc_;
+15828 +      by _cluster_;
+15829 +   run;
+15831 +   %tmsort(data=_desc_,
+15832 +         out=&outclusters,
+15833 +         by=_cluster_,
+15834 +            options=,
+15835 +         threads=threads);
+15837 +   %if &algorithm=2.0 %then %do;
+15839 +        %tmsort(data=&HIERDS,
+15840 +         out=&HIERDS,
+15841 +         by=_cluster_,
+15842 +            options=,
+15843 +         threads=threads);
+15845 +        data &HIERds;
+15846 +            merge &outCLUSTERS &HIERds (keep=_cluster_ parent level in=P);
+15847 +            by _cluster_;
+15848 +            clust=_cluster_;
+15849 +            drop _cluster_;
+15850 +            if P;
+15851 +        run;
+15853 +        %let empty=1;
+15855 +        /* Be sure that all parent clusters are on outclusters ds */
+15856 +        proc sql noprint;
+15857 +            create table &outclusters as
+15858 +                select a._cluster_, b.* from &hierds (rename=(clust=_CLUSTER_)) a
+15859 +                left join &outclusters b
+15860 +                on a._cluster_=b._cluster_;
+15861 +        quit;
+15863 +        %do %while (&empty);
+15864 +            proc sql noprint;
+15865 +                update &outclusters set freq=
+15866 +                    (select sum(freq) from &HIERDS
+15867 +                    where parent=_cluster_), percent=
+15868 +                    (select sum(percent) from &HIERDS
+15869 +                    where parent=_cluster_)
+15870 +                    where freq=. and _cluster_ not in
+15871 +                    (select parent from &hierds where freq=.);
+15872 +                select count(*) into :empty from &outclusters
+15873 +                    where freq=.;
+15874 +                update &hierds set freq=(select freq from &outclusters where _cluster_=clust);
+15875 +            quit;
+15876 +            data &HIERds;
+15877 +                merge &OUTCLUSTERS &HIERds (
+15878 +                    rename=(clust=_cluster_) keep=clust parent level in=P);
+15879 +                by _cluster_;
+15880 +                clust=_cluster_;
+15881 +                drop _cluster_;
+15882 +                if P;
+15883 +            run;
+15884 +        %end;
+15886 +        data &hierds;
+15887 +            set &hierds(rename=(CLUST=_CLUSTER_) keep=clust FREQ CLUS_DESC PARENT level);
+15888 +        run;
+15889 +        data &outclusters;
+15890 +            set &outclusters;
+15891 +            if _rmsstd_ ne .;
+15892 +        run;
+15894 +        data &outdocs;
+15895 +            set &outdocs (drop=_FINALCLUSTER_ _SUBCLUSTER_);
+15896 +            label _CLUSTER_=Cluster ID;
+15897 +        run;
+15899 +    %end;
+15901 +   %end_train_cluster:
+15903 +       filename temp;
+15905 +       %if &tm_debug =0  %then %do;
+15906 +          proc sql nowarn noprint;
+15907 +              drop table _clusstat;
+15908 +              drop table _clusstat2;
+15909 +              drop table _fastclusstat;
+15910 +              drop table _clustermean;
+15911 +              drop table _meandocs;
+15912 +              drop table _rmscalc;
+15913 +              drop table _rmsse;
+15914 +              drop table _meanerr;
+15915 +              drop table _tmutildoc;
+15916 +              drop table _desc_;
+15917 +              drop table _terms_;
+15918 +              drop table _docs_;
+15919 +              drop table _tmout_;
+15920 +           quit;
+15921 +       %end;
+15924 +%mend;
+NOTE: %INCLUDE (level 1) ending.
+NOTE: %INCLUDE (level 1) file TEMP is file SASHELP.EMTXTEXT.TM_APPLY_TMUTIL.SOURCE.
+15926 + /*****************************************************************
+15927 + * Copyright (C) 2009 by SAS Institute Inc., Cary, NC 27513
+15928 + *
+15929 + * Name:             tm_apply_tmutil.sas
+15930 + * Support:          rualbr Russell Albright
+15931 + * Product:
+15932 + * Language:         Sas
+15933 + * Script:
+15934 + *
+15935 + * Usage:
+15936 + *
+15937 + * data= out data set from tgparse
+15938 + * terms= terms from tgparse
+15939 + * offsets=  addoffset data set form tgparse
+15940 + * docs=  data set of document id's and potentially target, not required unless target weighting is used.
+15941 + * keepdocs= list of docs to keep. This is a subset of the original docs data set. Not required.
+15942 + * reduceF=defaults to log(n) if not specified, eliminates terms if not in at least that many docs
+15943 + *     use reduceF=1 to retain all terms.
+15944 + * termweight= none, entropy, mi,
+15945 + * cellweight= none, log, bin,
+15946 + * synnum= Input synonym data set of _termnum_, parent ID pairs
+15947 + * synchar= Input synonym data set of term,termrole, parent, parentrole. This data set will
+15948 + * get converted to synnym format by the macro tm_convert_syns.
+15949 + * targetvar= name of variable on doc dataset contining targetvar.
+15950 + * outdata= output out dataset with no more children on this dataset
+15951 + * outterms= output terms dataset with dup terms eliminated
+15952 + * outweights= weight vector for the terms
+15953 + * outoffsets= subsetted outtable with childterms replaced with parents
+15954 + * applyweight = , indicates if the weight settings are to be applied to the output OUT table. 0 no, 1 yes.
+15955 + * memloc= string for tmutil to use to store its memory pointer. Normally the default can just be used.
+15956 + * keeponly=Y  If set to Y (default), then only kept terms are output in terms table.
+15957 + *
+15958 + * Purpose: Massage the out and key from docparse so that they can bes used
+15959 + * in data mining applications.
+15960 + *
+15961 + * History:
+15962 + *
+15963 + * Notes:
+15964 + *
+15965 + * Last Modified By:
+15966 + * Last Modified On: Tue Mar 05 16:32:57 2013
+15967 + *
+15968 + * End
+15969 + * ************************************************************** */
+15972 +%macro tm_apply_tmutil(data=, terms=,docs=,offsets=,keepdocs=,termweight=none,
+15973 +                            cellweight=none,reduceF=,outdata=,outterms=,outweights=,
+15974 +                            outoffsets=, synnum=,synchar=, targetvar=, applyweight = 0,
+15975 +                            memloc=tmutil_loc,keeponly=Y,repOnly=N);
+15976 +     %local keepdocs tempF reduceF synnum  terms  paraExist sentExist;
+15979 +    %let EMEXCEPTIONSTRING=;
+15980 +    %let syscc=0;
+15981 +    %let systmutil=0;
+15985 +    /* Find terms to drop */
+15986 +        %if &keepdocs ne %then %do;
+15987 +          proc sql noprint;
+15988 +                create view _keepdata as
+15989 +                select * from &data where _DOCUMENT_ in
+15990 +                (select _DOCUMENT_ from &keepdocs);
+15991 +          quit;
+15992 +        %end;
+15993 +          %else %do;
+15995 +             proc sql noprint;
+15996 +                 create view _keepdata as
+15997 +                 select * from &data;
+15998 +             quit;
+16000 +           %let keepdocs=&docs;
+16001 +        %end;
+16004 +    /* set default on reduceF*/
+16005 +         %if &reduceF = %then %do;
+16006 +            proc sql noprint;
+16007 +           select count(*) into :numdocs from &docs;
+16008 +        quit;
+16009 +        %let tempF = %sysfunc(log10(%eval(&numdocs+1)));
+16010 +        %let reduceF= %sysfunc(floor(&tempF));
+16011 +         %end;
+16014 +    /* find synnum if synchar supplied */
+16016 +    %if &synchar ne %then %do;
+16017 +            filename temp catalog 'sashelp.emtxtext.tm_convert_syns.source';
+16018 +            %include temp;
+16019 +            %tm_convert_syns(insyns= &synchar, outsyns=_myOutsyns ,
+16020 +                         interms=&terms,
+16021 +                          outterms=newterms );
+16022 +                %let numsyns=0;
+16023 +                proc sql;
+16024 +                   select count(*) into: numsyns
+16025 +                   from _myOutsyns;
+16026 +                quit;
+16027 +                %if &numsyns >0 %then %do;
+16028 +                   %Let synnum=_myOutsyns;
+16029 +                   %let terms=newterms;
+16030 +                %end;
+16031 +    %end;
+16032 +    /* get the out and key in the proper format*/
+16033 +    proc tmutil data=_keepdata key= &terms doc=&keepdocs
+16034 +        %if &targetvar ne %then target=&targetvar;
+16035 +        ;
+16036 +        control init memloc="&memloc";
+16037 +            %if &synnum ne %then syn syndata=&synnum force;
+16038 +         ;
+16039 +    run;
+16040 +    %if &syscc >4 %then %goto end_tm_apply_tmutil;
+16041 +    %if &reduceF>1 %then %do;
+16042 +           proc tmutil;
+16043 +           control memloc="&memloc";
+16044 +               select reduceF=&reduceF;
+16045 +        run;
+16046 +   %end;
+16047 +    %if &syscc >4 %then %goto end_tm_apply_tmutil;
+16049 +     proc tmutil;
+16050 +        control memloc="&memloc" release;
+16051 +        weight termwgt=&termweight cellwgt=&cellweight;
+16052 +            output key=_termstmutil  keyformat=default
+16053 +               %if &keeponly eq Y %then keeponly;
+16054 +               %if &applyweight  eq 0 %then unweighted ;
+16055 +               out=&outdata;
+16056 +    run;
+16057 +    %if &syscc >4 %then %goto end_tm_apply_tmutil;
+16059 +    proc sql noprint;
+16060 +           create table _distinctterms as
+16061 +           select distinct key,term, role, attribute
+16062 +           from &terms;
+16064 +       create table &outterms as
+16065 +       select  b.term, b.role,b.attribute ,a.*
+16066 +       from _termstmutil a left join  _distinctterms b
+16067 +       on a.key=b.key;
+16068 +       ;
+16069 +       %if &outweights ne %then %do;
+16070 +          create table &outweights as
+16071 +          select distinct a.key as index, a.weight as gwgt
+16072 +          from &outterms(where=(_ispar in('+',' '))) a inner join
+16073 +                         _distinctterms b
+16074 +          on a.key =b.key;
+16075 +       %end;
+16077 +     quit;
+16078 +     %if &offsets ne and &outoffsets ne %then %do;
+16080 +        %let paraExist=0; %let sentExist=0;
+16081 +        data _null_;
+16082 +          dsid=open("&offsets");
+16083 +          para=varnum(dsid,'_paragraph_');
+16084 +          sent=varnum(dsid,'_sentence_');
+16085 +          if para ge 1 then call symput('paraExist',1);
+16086 +          if sent ge 1 then call symput('sentExist',1);
+16087 +          run;
+16090 +        proc sql noprint;
+16091 +        create table &outoffsets as
+16092 +           select  a._document_,
+16093 +              %if &paraExist=1 %then a._paragraph_, ;
+16094 +              %if &sentExist=1 %then a._sentence_,;
+16095 +              a._offset_, a._length_, b.parent_id as _termnum_
+16096 +                 from &offsets a, _termstmutil (where=(_ispar ne "+" and keep="Y")) b
+16097 +                 where a._termnum_ = b.key;
+16098 +              quit;
+16099 +       %end;
+16103 +     %end_tm_apply_tmutil:
+16105 +     %if ^%symexist(tm_debug) %then %let tm_debug=0;
+16106 +       %if &tm_debug =0  %then %do;
+16107 +          proc sql noprint;
+16108 +            drop table _termstmutil;
+16109 +            drop table _distinctterms;
+16110 +            drop view _keepdata;
+16111 +            %if &synchar ne and &synnum ne  %then drop table &synnum; ;
+16112 +         quit;
+16113 +     %end;
+16114 +     %if &syscc >4 and &systmutil > 4 %then %do;
+16115 +           %let EMEXCEPTIONSTRING = EMTOOL.TMUTIL,&systmutil;
+16116 +           %put emexceptionstring= "&EMEXCEPTIONSTRING";
+16117 +           %let syscc=0;
+16118 +     %end;
+16120 +%mend;
+NOTE: %INCLUDE (level 1) ending.
+NOTE: %INCLUDE (level 1) file TEMP is file SASHELP.EMTXTEXT.TM_SVD_DO_SAMP.SOURCE.
+16122 +   /* ****************************************************************
+16123 + * Copyright (C) 2009 by SAS Institute Inc., Cary, NC 27513
+16124 + *
+16125 + * Name:             tm_svd_do_samp.sas
+16126 + * Product:
+16127 + * Language:         Sas
+16128 + * Script:
+16129 + *
+16130 + * Usage:
+16131 + *
+16132 + * data=out dataset containing only repreentative terms
+16133 + * maxK= max number of dimensions to use to computer svd
+16134 + * res=<high, med, low> guidenceon what number of dims to choose
+16135 + * cellwgt= <none, log, binary>
+16136 + * in_global= dataset with index, weight variables
+16137 + * rowVar= name of the variable representing row(term)
+16138 + * colVar= name of the variable representing col
+16139 + * entryVar=count for row,col
+16140 + * u= name of output u matrix
+16141 + * v= name of output v matrix
+16142 + * s= name of output s matrix
+16143 + * colpro=dataset to hold projections for terms
+16144 + * rowpro= datset to hold projections for docs
+16145 + * normcol=<normcol> extra option to add to normalize docs
+16146 + * normrow=<normrow> extra option to add to normalize terms
+16147 + * docs =<document data set of ids that are being analyzed.
+16148 +*      docs needs to be input explicit since some docs may have not terms
+16149 + *
+16150 + * Purpose: macro to run svd and compute projections, first without mpling
+16151 + * and then with sampling onon.
+16152 + *
+16153 + * History:
+16154 + *
+16155 + * Notes:
+16156 + *
+16157 + * Last Modified By:
+16158 + * Last Modified On: Thu Jan 08 17:22:43 2009
+16159 + *
+16160 + * End
+16161 + * ************************************************************** */
+16162 +%macro tm_svd_do_samp(data=,docs=,maxK=,res=,cellwgt=,in_global=,
+16163 +                     rowVar=,colVar=,entryVar=,u=,v=,s=,
+16164 +                     colpro=,rowpro=,normcol=, normrow=,prefix=SVD);
+16166 +   %local svdkeep;
+16167 +   %let syscc=0;
+16168 +   proc sort data=&data; by _termnum_; run;
+16170 +   proc spsvd data=&data max_k = &maxK res = &res
+16171 +       local = &cellWgt global =none in_global = &in_global;
+16172 +       row _termnum_;
+16173 +       col _document_;
+16174 +       entry _count_;
+16175 +       output  u = &U v = &V s = &s;
+16176 +   run;
+16178 +   /*try sampling if out of memory occurred*/
+16179 +   %if(&syscc eq 1111) %then %do;
+16180 +      %let syscc=0; /*reset syscc*/
+16181 +      proc spsvd data = &data max_k = &maxK res = &res
+16182 +          local = &cellWgt global = none in_global = &in_global ;
+16183 +          row &rowVar;
+16184 +          col &colVar;
+16185 +          entry &entryVar;
+16186 +          output u = &U v = &V s = &s;
+16187 +          sample allow;
+16188 +      run;
+16189 +   %end;
+16190 +    %if &syscc > 4 %then %do;
+16191 +       %let EMEXCEPTIONSTRING = EMTOOL.SPSVDERROR;
+16192 +       %goto end_svd_do_samp;
+16193 +    %end;
+16196 +   /* if resolution is used, the matrix U/V must be truncated to the set number of dim.*/
+16197 +   proc sql noprint;
+16198 +       select count(*) into: svdkeep
+16199 +       from &s
+16200 +       where keep=1;
+16201 +    quit;
+16203 +    %let svdkeep=%left(&svdkeep);
+16204 +    data &U;
+16205 +    set &U(keep= index col1-col&svdkeep);
+16206 +    run;
+16208 +    data &V;
+16209 +    set &V(keep= index col1-col&svdkeep);
+16210 +    run;
+16211 +    %if &colpro ne %then %do;
+16212 +       /* when sampling weights may have wrong dimensions*/
+16213 +       proc sql noprint;
+16214 +          create table new_global as
+16215 +             select a.*
+16216 +             from &in_global a, &U b
+16217 +             where a.index = b.index;
+16218 +       quit;
+16221 +        proc sort data=&data; by &colVar; run;
+16222 +        proc spsvd data=&data IN_U=&U
+16223 +            local = &cellWgt global = none in_global = new_global ;
+16224 +            row &rowVar;
+16225 +            col &colVar;
+16226 +            entry &entryVar;
+16227 +            output colpro=&colpro bigpro normcol prefix="&prefix._SVD";
+16228 +        run;
+16230 +        proc sort data=&docs(keep=_document_)  out=_docids;
+16231 +        by _document_;
+16232 +        run;
+16234 +        data &colpro;
+16235 +           merge &colpro _docids(rename=(_document_=index));
+16236 +        by index;
+16237 +        run;
+16240 +        data &colpro;
+16241 +          set  &colpro;
+16242 +          array svd_array &prefix._SVD1 - &prefix._SVD&SVDKEEP;
+16243 +          do i = 1 to dim(svd_array);
+16244 +             if svd_array(i)=. then svd_array(i)=0;
+16245 +          end;
+16246 +          drop i;
+16247 +        run;
+16248 +    %end;
+16250 +    %if &syscc > 4 %then %do;
+16251 +       %let EMEXCEPTIONSTRING = EMTOOL.SPSVDERROR;
+16252 +       %goto end_svd_do_samp;
+16253 +    %end;
+16255 +    %if &rowpro ne %then %do;
+16256 +        proc sort data=&data; by &rowVar; run;
+16257 +        /* when sampling weights may have wrong dimensions*/
+16258 +       proc sql;
+16259 +          create table new_global as
+16260 +             select a.*
+16261 +             from &in_global a, &U b
+16262 +             where a.index = b.index;
+16263 +       quit;
+16265 +        proc spsvd data=&data IN_V=&V
+16266 +            local = &cellWgt global = none in_global = new_global ;
+16267 +            row &rowVar; col &colVar; entry &entryVar;
+16268 +            output wordPro = &rowpro bigpro normrow prefix="&prefix._SVD";
+16269 +        run;
+16270 +    %end;
+16272 +    %if &syscc > 4 %then %do;
+16273 +       %let EMEXCEPTIONSTRING = EMTOOL.SPSVDERROR;
+16274 +       %goto end_svd_do_samp;
+16275 +    %end;
+16277 +   %end_svd_do_samp:
+16279 +%mend;
+NOTE: %INCLUDE (level 1) ending.
+NOTE: Fileref TEMP has been deassigned.
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+ 
+ 
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+ 
+ 
+ 
+NOTE: There were 1 observations read from the data set EMWS1.TEXTCLUSTER_VARIABLESET.
+      WHERE (KUPCASE(NAME)='MESSAGE') and USE in ('D', 'Y');
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 5 observations read from the data set EMWS1.TEXTFILTER_EMINFO.
+NOTE: The data set EMWS1.TEXTCLUSTER_LAST_TM_NODES has 5 observations and 3 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.05 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 0 observations read from the data set EMWS1.TEXTCLUSTER_VARIABLESET.
+      WHERE (ROLE='TARGET') and USE in ('D', 'Y') and (LEVEL not = 'INTERVAL');
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+ 
+ 
+NOTE: Table EMWS1.TEXTCLUSTER_TMCONFIG created, with 1 rows and 29 columns.
+ 
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.06 seconds
+      cpu time            0.01 seconds
+ 
+ 
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+ 
+ 
+ 
+NOTE: There were 3849 observations read from the data set EMWS1.TEXTPARSING_TRAIN.
+NOTE: There were 3849 observations read from the data set EMWS1.TEXTFILTER_DOC_IDS.
+NOTE: There were 3849 observations read from the data set EMWS1.TEXTFILTER_TRAIN.
+NOTE: The data set WORK._KEEPDOCS has 3849 observations and 1 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.05 seconds
+      cpu time            0.04 seconds
+ 
+ 
+NOTE: SQL view WORK._KEEPDATA has been defined.
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+ 
+ 
+ 
+WARNING:  The input DOC data set contained documents numbered larger than those on the input DATA data set.
+NOTE: There were 18529 observations read from the data set EMWS1.TEXTFILTER_TMOUT.
+NOTE: There were 3848 observations read from the data set WORK._KEEPDOCS.
+NOTE: There were 18529 observations read from the data set WORK._KEEPDATA.
+NOTE: There were 2872 observations read from the data set EMWS1.TEXTFILTER_TERMS_DATA.
+      WHERE KEEP='Y';
+NOTE: There were 10098 observations read from the data set EMWS1.TEXTFILTER_TERM_STRINGS.
+NOTE: There were 3849 observations read from the data set WORK._KEEPDOCS.
+NOTE: PROCEDURE TMUTIL used (Total process time):
+      real time           0.14 seconds
+      cpu time            0.07 seconds
+ 
+ 
+ 
+NOTE: PROCEDURE TMUTIL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+ 
+ 
+ 
+NOTE: The data set WORK._TERMSTMUTIL has 2872 observations and 8 variables.
+NOTE: The data set WORK._OUTTMUTIL_ has 18501 observations and 3 variables.
+NOTE: PROCEDURE TMUTIL used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.00 seconds
+ 
+ 
+NOTE: Table WORK._DISTINCTTERMS created, with 2357 rows and 4 columns.
+ 
+NOTE: Table WORK._NEWKEY created, with 2872 rows and 11 columns.
+ 
+NOTE: Table WORK._WEIGHTS created, with 1571 rows and 2 columns.
+ 
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.07 seconds
+      cpu time            0.06 seconds
+ 
+ 
+ 
+NOTE: There were 18501 observations read from the data set WORK._OUTTMUTIL_.
+NOTE: The data set WORK._OUTTMUTIL_ has 18501 observations and 3 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+ 
+ 
+ 
+NOTE: P has been set to 75.
+NOTE: Restart 1, Converged 18
+NOTE: Singular values have converged.  Creating data sets.
+NOTE: Restarted 1 times.
+NOTE: Using value of 11 for K.
+NOTE: There were 18501 observations read from the data set WORK._OUTTMUTIL_.
+NOTE: There were 1571 observations read from the data set WORK._WEIGHTS.
+NOTE: The data set EMWS1.TEXTCLUSTER_SVD_U has 1571 observations and 21 variables.
+NOTE: The data set WORK._SVDV has 3701 observations and 21 variables.
+NOTE: The data set EMWS1.TEXTCLUSTER_SVD_S has 20 observations and 2 variables.
+NOTE: PROCEDURE SPSVD used (Total process time):
+      real time           0.26 seconds
+      cpu time            0.09 seconds
+ 
+ 
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 1571 observations read from the data set EMWS1.TEXTCLUSTER_SVD_U.
+NOTE: The data set EMWS1.TEXTCLUSTER_SVD_U has 1571 observations and 12 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.06 seconds
+      cpu time            0.00 seconds
+ 
+ 
+ 
+NOTE: There were 3701 observations read from the data set WORK._SVDV.
+NOTE: The data set WORK._SVDV has 3701 observations and 12 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.03 seconds
+ 
+ 
+NOTE: Table WORK.NEW_GLOBAL created, with 1571 rows and 2 columns.
+ 
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.05 seconds
+      cpu time            0.03 seconds
+ 
+ 
+ 
+NOTE: There were 18501 observations read from the data set WORK._OUTTMUTIL_.
+NOTE: The data set WORK._OUTTMUTIL_ has 18501 observations and 3 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 18501 observations read from the data set WORK._OUTTMUTIL_.
+NOTE: There were 1571 observations read from the data set EMWS1.TEXTCLUSTER_SVD_U.
+NOTE: There were 1571 observations read from the data set WORK.NEW_GLOBAL.
+NOTE: The data set WORK._SVDCOLPRO has 3701 observations and 12 variables.
+NOTE: PROCEDURE SPSVD used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 3849 observations read from the data set WORK._KEEPDOCS.
+NOTE: The data set WORK._DOCIDS has 3849 observations and 1 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+ 
+ 
+ 
+NOTE: There were 3701 observations read from the data set WORK._SVDCOLPRO.
+NOTE: There were 3849 observations read from the data set WORK._DOCIDS.
+NOTE: The data set WORK._SVDCOLPRO has 3849 observations and 12 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 3849 observations read from the data set WORK._SVDCOLPRO.
+NOTE: The data set WORK._SVDCOLPRO has 3849 observations and 12 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 18501 observations read from the data set WORK._OUTTMUTIL_.
+NOTE: The data set WORK._OUTTMUTIL_ has 18501 observations and 3 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+ 
+ 
+NOTE: Table WORK.NEW_GLOBAL created, with 1571 rows and 2 columns.
+ 
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.00 seconds
+ 
+ 
+ 
+NOTE: There were 18501 observations read from the data set WORK._OUTTMUTIL_.
+NOTE: There were 3701 observations read from the data set WORK._SVDV.
+NOTE: There were 1571 observations read from the data set WORK.NEW_GLOBAL.
+NOTE: The data set WORK._SVDROWPRO has 1571 observations and 12 variables.
+NOTE: PROCEDURE SPSVD used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+ 
+ 
+NOTE: Table EMWS1.TEXTCLUSTER_TERMS created, with 2872 rows and 24 columns.
+ 
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.14 seconds
+      cpu time            0.06 seconds
+ 
+ 
+NOTE: %INCLUDE (level 1) file TEMP is file SASHELP.EMTEXT.TMGETNCL.SOURCE.
+16282 +
+16283 + /*
+16284 +  Macro:   tmgetncl.sas
+16285 +  Purpose: To obtain a default number of clusters
+16286 +  Syntax:  %tmgetncl(data=, maxclusters=, vars=);
+16287 +
+16288 +  Required Parameters:  data=      The input data set.
+16289 +
+16290 +  Optional Parameters:  vars=      Variables to be used
+16291 +
+16292 +  History:
+16293 +  2001/01/23 - Bill Wheeler - Initial Coding.
+16294 +
+16295 +*/
+16296 + %MACRO tmgetncl(data=, maxclusters=, vars=, tempDS=,
+16297 +                 clusDS=, threads=THREADS);
+16298 +
+16299 +  %if &maxclusters= %then %let maxclusters = 40;
+16300 +
+16301 +  %if &vars ^= %then %let var = var &vars;
+16302 +  %else %let var = ;
+16303 +
+16304 +  /* run PROC FASTCLUS with maxClusters clusters */
+16305 +  proc fastclus data = &data noprint
+16306 +    maxclusters = &maxclusters
+16307 +    mean = &tempDS;
+16308 +    &var
+16309 +    ;
+16310 +    run;
+16311 +
+16312 +  /* use PROC CLUSTER with the MEAN data set from FASTCLUS */
+16313 +  proc cluster data = &tempDS
+16314 +    method = WARD
+16315 +    pseudo
+16316 +    noprint
+16317 +    outtree = &tempDS;
+16318 +    &var;
+16319 +  run;
+16320 +
+16321 +  %if (&SYSERR > 4) %then %do;
+16322 +    data &clusDS; nclus = 0; run;
+16323 +    %goto exit;
+16324 +  %end;
+16325 +
+16326 +  /* sort and get rid of missing values in the outtree data set */
+16327 +  %tmsort(data=&tempDS(where=(_ccc_ > -99999.0) keep = _ncl_ _ccc_),
+16328 +        out=&tempDS, by=_ncl_, options=, threads=&threads);
+16329 +
+16330 +  data &clusDS; set &tempDS;
+16331 +    keep nclus;
+16332 +    retain loclclus -1 loclccc 0 maxccc 0 maxclus 0
+16333 +   jclus -1 maxjump -1 nclus 0 jccc 0 prevjump 0 jump 0 occc 0 oncl 0;
+16334 +
+16335 +   if _N_ = 1 then do;
+16336 +     maxccc = _ccc_;
+16337 +     maxclus = _ncl_;
+16338 +     nclus = _ncl_;
+16339 +     occc = _ccc_;
+16340 +     oncl = _ncl_;
+16341 +   end;
+16342 +   else if (_N_ = 2) then do;
+16343 +     jump = _ccc_ - occc;
+16344 +     if (jump > 0) then do;
+16345 +       maxjump = jump;
+16346 +       jclus = _ncl_;
+16347 +     end;
+16348 +     if (_ccc_ > maxccc) then do;
+16349 +       maxccc = _ccc_;
+16350 +       maxclus = _ncl_;
+16351 +     end;
+16352 +     occc = _ccc_;
+16353 +     oncl = _ncl_;
+16354 +   end;
+16355 +
+16356 +   else if (_N_ > 2) then do;
+16357 +     prevjump = jump;
+16358 +     jump = _ccc_ - occc;
+16359 +
+16360 +     if ((prevjump > 0) & (jump < 0) & (loclclus < 0)) then do;
+16361 +        loclclus = oncl;
+16362 +        loclccc = occc;
+16363 +     end;
+16364 +     if (_ccc_ > maxccc) then do;
+16365 +       maxccc = _ccc_;
+16366 +       maxclus = _ncl_;
+16367 +     end;
+16368 +     if ((jump > 0) & (jump > maxjump)) then do;
+16369 +       jclus = _ncl_;
+16370 +       maxjump = jump;
+16371 +       jccc = _ccc_;
+16372 +     end;
+16373 +
+16374 +     occc = _ccc_;
+16375 +     oncl = _ncl_;
+16376 +
+16377 +     if ((loclclus > 0) & (jclus > 0)) then nclus = MIN(loclclus, jclus);
+16378 +     else if (loclclus > 0) then nclus = loclclus;
+16379 +     else if (jclus > 0) then nclus = jclus;
+16380 +     else nclus = maxclus;
+16381 +   end;
+16382 +  run;
+16383 +
+16384 +  %exit: ;
+16385 +
+16386 +%MEND tmgetncl;
+NOTE: %INCLUDE (level 1) ending.
+NOTE: %INCLUDE (level 1) file TEMP is file SASHELP.EMTEXT.TMFAST.SOURCE.
+16387 + /*
+16388 +
+16389 +  Macro:   tmfast.sas
+16390 +  Purpose: Call proc fastclus with given defaults and parameters.
+16391 +  Syntax:  %tmfast(data=, clusters=, outstat=, vars=);
+16392 +
+16393 +  Required Parameters:  data=      The input data set.
+16394 +                        clusters=  The maximum number of clusters
+16395 +
+16396 +  Optional Parameters:  vars=      Variables to be used
+16397 +                        outstat=   The name of the OUTSTAT data set
+16398 +                        outseed=   The name of the OUTSEED data set
+16399 +
+16400 +  Either outstat or outseed mut be given, but not both.
+16401 +  History:
+16402 +  2001/01/16 - Bill Wheeler - Initial Coding.
+16403 +
+16404 +*/
+16405 +%MACRO tmfast(data=, clusters=, outstat=, outseed=,
+16406 +                 id=, out=, vars=);
+16407 + /* defaults */
+16408 + %if (&id ne ) %then %let id = id &id;
+16409 + %if (&out ne ) %then %let out = out = &out;
+16410 + %if (&vars ne ) %then %let var = var &vars;
+16411 + %else %let var = ;
+16412 +
+16413 + %if &outseed= %then
+16414 + %do;
+16415 +   proc fastclus data = &data
+16416 +   maxclusters = &clusters noprint
+16417 +   outstat = &outstat &out;
+16418 +   &var;
+16419 +   &id;
+16420 + %end;
+16421 + %else
+16422 + %do;
+16423 +   proc fastclus data = &data
+16424 +   maxclusters = &clusters noprint
+16425 +   outseed = &outseed &out;
+16426 +   &var;
+16427 +   &id;
+16428 + %end;
+16429 +%MEND tmfast;
+NOTE: %INCLUDE (level 1) ending.
+NOTE: %INCLUDE (level 1) file TEMP is file SASHELP.EMTEXT.TMEMCLUS.SOURCE.
+16430 +
+16431 + /*
+16432 +
+16433 +  Macro:   tmemclus.sas
+16434 +  Purpose: Call proc emclus with given defaults and parameters.
+16435 +  Syntax:  %tmemclus(data=, role=, clusters=, seed=,
+16436 +                   outstat=, out=, vars=, cov=, iter=, secclus=,
+16437 +                   seciter=, min=, method=, eps=, init=, print=,
+16438 +                   p=, outliers=, decvar=, initstd=, dist=,
+16439 +                   secstd=, nobs=, threads=);
+16440 +  Required Parameters:  data=      The input data set.
+16441 +                        role=      Train or score
+16442 +                        clusters=  The number of primary clusters
+16443 +
+16444 +  Optional Parameters:  vars=      Variables to be used
+16445 +                   cov=       Type of covariance matrix
+16446 +                   iter=      Number of EM iterations
+16447 +                   secclus    Number of secondary clusters
+16448 +                   seciter    Number of k-means iterations
+16449 +                   min=       Minimum number of obs in a cluster
+16450 +                   method=    Standard or scaled
+16451 +                   eps=       Stopping tolerance
+16452 +                   init=      Random, Fastclus, or Emclus
+16453 +                   print=     All, last, or none
+16454 +                   p=
+16455 +                   outliers=  Keep, cluster, or ignore
+16456 +                   outstat=   Name of OUTSTAT data set
+16457 +                   out=       Name of OUT data set
+16458 +                   seed=      Name of SEED data set
+16459 +                   decvar=    Proportion to decrease variances
+16460 +                   initstd=   Initial standard deviation
+16461 +                   dist=      Minimum distance between clusters
+16462 +                   secstd=    Secondary cluster max std dev.
+16463 +                   nobs=      Number of obs read in each iteration
+16464 +  History:
+16465 +  2001/01/16 - Bill Wheeler - Initial Coding.
+16466 +  2001/11/29 - Bill Wheeler - Updated for version 8 or 9
+16467 +*/
+16468 +%MACRO tmemclus(data=, role=, clusters=, seed=,
+16469 + outstat=, out=, vars=, cov=, iter=, secclus=,
+16470 + seciter=, min=, method=, eps=, init=, print=,
+16471 + p=, outliers=, decvar=, initstd=, dist=, secstd=, nobs=, threads=);
+16472 +
+16473 + %local saveout saveseed op1 op2 op3 op4;
+16474 +
+16475 + %LET saveout = &out;
+16476 + %LET saveseed = &outstat;
+16477 +
+16478 + /* defaults */
+16479 + %if &role= %then %let role = TRAIN;
+16480 + %if &seed ne %then %let seed = seed=&seed;
+16481 + %if &vars= %then %let var = ;
+16482 + %else %let var = var &vars;
+16483 + %if &cov ne %then %let cov = cov = &cov;
+16484 + %if &iter ne %then %let iter = iter = &iter;
+16485 + %if &init ne %then %let init = init = &init;
+16486 + %if &eps ne  %then %let eps = eps = &eps;
+16487 + %if &min ne %then %let min = min = &min;
+16488 + %if &seciter ne %then %let seciter = seciter = &seciter;
+16489 + %if &print ne %then %let print = print = &print;
+16490 + %if &p ne %then %let p = p = &p;
+16491 + %if &outliers ne %then %let outliers = outliers = &outliers;
+16492 + %if &method ne %then %let method = method = &method;
+16493 + %if &decvar ne %then %let decvar = decvar = &decvar;
+16494 + %if &outstat ne %then %let outstat = outstat = &outstat;
+16495 + %if &out ne %then %let out = out = &out;
+16496 + %if (&threads >= 0)  %then %let threads = threads = &threads;
+16497 + %else %let threads = ;
+16498 +
+16499 + %LET op1 = ;
+16500 + %LET op2 = ;
+16501 + %LET op3 = ;
+16502 + %LET op4 = ;
+16503 + %if ^(&initstd=) %then %let op1 = %str(initstd = &initstd);
+16504 + %if ^(&dist=) %then %let op2 = %str(dist = &dist);
+16505 + %if ^(&secstd=) %then %let op3 = %str(secstd = &secstd);
+16506 + %if ^(&nobs=) %then %let op4 = %str(nobs = &nobs);
+16507 +
+16508 +
+16509 + %IF &SYSVER < 9 %THEN %DO;
+16510 +    %LET cov = ;
+16511 +    %LET decvar = ;
+16512 +    %LET outliers = ;
+16513 +    %LET out = ;
+16514 + %END;
+16515 +
+16516 +
+16517 + %if %upcase(&role) = TRAIN %then
+16518 + %do;
+16519 +   proc emclus data = &data
+16520 +   clusters = &clusters
+16521 +   &seed
+16522 +   &outstat
+16523 +   &out
+16524 +   &init
+16525 +   &eps
+16526 +   &method
+16527 +   &secclus
+16528 +   &min
+16529 +   &print
+16530 +   &outliers
+16531 +   &iter
+16532 +   &op1 &op2
+16533 +   &op3 &op4
+16534 +   &decvar
+16535 +   &cov
+16536 +   &threads
+16537 +   ;
+16538 +   &var;
+16539 + %end;
+16540 + %else
+16541 +  %do;
+16542 +    proc emclus data = &data
+16543 +    role = score
+16544 +    clusters = &clusters
+16545 +    &seed
+16546 +    &out
+16547 +    &cov
+16548 +    ;
+16549 +    &var;
+16550 +  %end;
+16551 +
+16552 + %IF &SYSVER < 9 and &saveout ^= %THEN %DO;
+16553 +   proc emclus data = &data
+16554 +   role = score
+16555 +   clusters = &clusters
+16556 +   seed = &saveseed
+16557 +   &saveout
+16558 +   ;
+16559 +   &var;
+16560 + %END;
+16561 +
+16562 +
+16563 +%MEND tmemclus;
+NOTE: %INCLUDE (level 1) ending.
+NOTE: %INCLUDE (level 1) file TEMP is file SASHELP.EMTEXT.TMPRED.SOURCE.
+16564 +
+16565 +/*
+16566 +  Macro: tmpred(inds,outds,clusters,type=,ignore=,freqDS=)
+16567 +
+16568 +  Description: This macro will take output from
+16569 +     emclus and generate predicted
+16570 +      predicted clusters.
+16571 +
+16572 +  Parms: inds - input data set, produced by emclus.
+16573 +   outds - data set with clusters created by this macro.
+16574 +   clusters - number of clusters that should be on this data set
+16575 +   type - valid values: 'max' or 'prob'.  Max will just take the
+16576 +      cluster with the highest probability as the predicted cluster.
+16577 +      In the case of a tie the first cluster with that value will
+16578 +       selected.
+16579 +      Prob will attempt to select multiple clusters based on
+16580 +      how many clusters were requested.  That is if 3 clusters
+16581 +      were requested, any cluster with prob>1/3 will be selected
+16582 +      as the predicted cluster. THIS OPTION IS UNTESTED.
+16583 +*/
+16584 +
+16585 +%macro tmpred(inds,outds,clusters,type=, ignore=0, freqDS=, compress=1);
+16586 +
+16587 +  %local _str newfreqDS _flag;
+16588 +
+16589 +  * set the optional arguments;
+16590 +  %if &type= %then %let type=max;
+16591 +  %if &ignore = 1 %then %let
+16592 +    _str = if _CLUSTER_ = &clusters then _CLUSTER_ = .;
+16593 +  %else %let _str = ;
+16594 +  %if %str(&freqDS) ^= %str() %then %do;
+16595 +   %let newfreqDS = &freqDS(keep=_c1-_c&clusters);
+16596 +   %let _flag = 1;
+16597 +  %end;
+16598 +  %else %let _flag = 0;
+16599 +
+16600 +  %if &compress = 1 %then %let compress = compress=Y;
+16601 +  %else %let compress = ;
+16602 +
+16603 +  data &outds(&compress drop=_c1-_c&clusters)
+16604 +    %if &_flag = 1 %then %do;
+16605 +    &newfreqDS
+16606 +    %end;
+16607 +    ;
+16608 +    set &inds end=eof;
+16609 +   * array for holding all probabilities;
+16610 +    array _p prob1--prob&clusters;
+16611 +    array _c(&clusters);
+16612 +    retain _c 0;
+16613 +   * get rid of working columns;
+16614 +    drop _max_ _i /*prob1--prob&clusters*/ _WARN_;
+16615 +    /* keep the largest probability and the cluster */
+16616 +    _max_ = 0;
+16617 +    do _i = 1 to &clusters;
+16618 +      if _p(_i) > _max_ then do;
+16619 +        _max_ = _p(_i);
+16620 +        _CLUSTER_ = _i;
+16621 +      end;
+16622 +    end;
+16623 +    if (_CLUSTER_ >= 1) and (_CLUSTER_ <= &clusters) then
+16624 +      _c(_CLUSTER_) = _c(_CLUSTER_) + 1;
+16625 +    else _CLUSTER_ = .;
+16626 +    &_str;
+16627 +    %if &_flag = 1 %then %do;
+16628 +      if eof then do;
+16629 +        output &freqDS;
+16630 +                output &outDS;
+16631 +          end;
+16632 +          else output &outDS;
+16633 +        %end;
+16634 +
+16635 +    run;
+16636 +%mend tmpred;
+NOTE: %INCLUDE (level 1) ending.
+NOTE: %INCLUDE (level 1) file TEMP is file SASHELP.EMTEXT.TMSORT.SOURCE.
+16637 + /*
+16638 +PROC SORT macro
+16639 +
+16640 +%tmsort(data=, out=, by=);
+16641 +
+16642 +data=      - name of input data set (outtree data set from PROC CLUSTER)
+16643 +out=       - name of the output data set
+16644 +by=        - by statement
+16645 +options=   - proc options
+16646 +*/
+16647 +
+16648 +%macro tmsort(data=, out=, by=, options=, threads=THREADS);
+16649 +  %if %BQUOTE(&out) ^= %then %let out = out =  &out;
+16650 +  %if &SYSVER < 9 %then %let threads = ;
+16651 +
+16652 +  proc sort data = %STR(&data) &threads &options
+16653 +    &out;
+16654 +    by &by;
+16655 +  run;
+16656 +
+16657 +%mend tmsort;
+NOTE: %INCLUDE (level 1) ending.
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.03 seconds
+      cpu time            0.03 seconds
+ 
+ 
+ 
+NOTE: The data set WORK._CLUSTEMP1 has 15 observations and 18 variables.
+NOTE: PROCEDURE FASTCLUS used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: The data set WORK._CLUSTEMP1 has 29 observations and 27 variables.
+NOTE: PROCEDURE CLUSTER used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+ 
+ 
+ 
+NOTE: There were 14 observations read from the data set WORK._CLUSTEMP1.
+      WHERE _ccc_>-99999;
+NOTE: The data set WORK._CLUSTEMP1 has 14 observations and 2 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 14 observations read from the data set WORK._CLUSTEMP1.
+NOTE: The data set WORK._CLUSTEMP has 14 observations and 1 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+ 
+ 
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+ 
+ 
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+ 
+ 
+ 
+NOTE: The data set WORK._FASTCLUSSTAT has 60 observations and 14 variables.
+NOTE: PROCEDURE FASTCLUS used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+ 
+ 
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: The standard EM algorithm will be run.
+NOTE: DIST is set to 0.2611508231
+NOTE: EPS is set to 0.1
+NOTE: INITSTD is set to 30.811816531
+NOTE: ITER is set to 5
+NOTE: MAXTIME is set to 2147483647
+WARNING: The maximum number of 5 iterations in the EM algorithm has been reached. Parameter estimates may not be accurate.
+NOTE: There were 3849 observations read from the data set WORK._SVDCOLPRO.
+NOTE: There were 60 observations read from the data set WORK._FASTCLUSSTAT.
+NOTE: The data set EMWS1.TEXTCLUSTER_EMOUTSTAT has 21 observations and 18 variables.
+NOTE: The data set WORK._TMUTILDOC has 3849 observations and 23 variables.
+NOTE: PROCEDURE EMCLUS used (Total process time):
+      real time           0.26 seconds
+      cpu time            0.10 seconds
+ 
+ 
+ 
+NOTE: There were 3849 observations read from the data set WORK._TMUTILDOC.
+NOTE: The data set EMWS1.TEXTCLUSTER_DOCS has 3849 observations and 23 variables.
+NOTE: Compressing data set EMWS1.TEXTCLUSTER_DOCS increased size by 18.18 percent.
+      Compressed is 13 pages; un-compressed would require 11 pages.
+NOTE: The data set WORK._CLUSSTAT has 1 observations and 10 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.09 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 3849 observations read from the data set EMWS1.TEXTCLUSTER_DOCS.
+NOTE: The data set EMWS1.TEXTCLUSTER_DOCS has 3849 observations and 23 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.08 seconds
+      cpu time            0.00 seconds
+ 
+ 
+ 
+NOTE: Numeric values have been converted to character values at the places given by: (Line):(Column).
+      451:154
+NOTE: There were 1 observations read from the data set WORK._CLUSSTAT.
+NOTE: The data set WORK._CLUSSTAT has 10 observations and 13 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.03 seconds
+ 
+ 
+ 
+NOTE: There were 10 observations read from the data set WORK._CLUSSTAT.
+NOTE: The data set WORK._CLUSSTAT has 10 observations and 14 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+ 
+ 
+ 
+NOTE: There were 21 observations read from the data set EMWS1.TEXTCLUSTER_EMOUTSTAT.
+NOTE: The data set WORK._CLUSTERMEAN has 10 observations and 12 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.03 seconds
+      cpu time            0.00 seconds
+ 
+ 
+NOTE: Table WORK._MEANDOCS created, with 3849 rows and 34 columns.
+ 
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.04 seconds
+      cpu time            0.03 seconds
+ 
+ 
+ 
+NOTE: There were 3849 observations read from the data set WORK._MEANDOCS.
+NOTE: There were 10 observations read from the data set WORK._CLUSSTAT.
+NOTE: The data set WORK._RMSCALC has 3849 observations and 48 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 3849 observations read from the data set WORK._RMSCALC.
+NOTE: The data set WORK._MEANERR has 10 observations and 5 variables.
+NOTE: PROCEDURE SUMMARY used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 10 observations read from the data set WORK._MEANERR.
+NOTE: The data set WORK._RMSSE has 10 observations and 2 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+ 
+ 
+NOTE: Table WORK._CLUSSTAT2 created, with 10 rows and 13 columns.
+ 
+NOTE: Table EMWS1.TEXTCLUSTER_CLUSTERS created, with 10 rows and 15 columns.
+ 
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.17 seconds
+      cpu time            0.00 seconds
+ 
+ 
+ 
+NOTE: Input data set is already sorted; it has been copied to the output data set.
+NOTE: There were 2872 observations read from the data set EMWS1.TEXTFILTER_TERMS_DATA.
+      WHERE KEEP='Y';
+NOTE: There were 10098 observations read from the data set EMWS1.TEXTFILTER_TERM_STRINGS.
+NOTE: There were 2872 observations read from the data set EMWS1.TEXTFILTER_TERMS.
+NOTE: The data set WORK._TERMS_ has 2872 observations and 13 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.05 seconds
+      cpu time            0.03 seconds
+ 
+ 
+ 
+NOTE: There were 2872 observations read from the data set WORK._TERMS_.
+NOTE: The data set WORK._TERMS_ has 2357 observations and 13 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 2357 observations read from the data set WORK._TERMS_.
+NOTE: The data set WORK._TERMS_ has 2357 observations and 13 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+ 
+ 
+ 
+NOTE: There were 18529 observations read from the data set EMWS1.TEXTFILTER_TMOUT.
+NOTE: The data set WORK._TMOUT_ has 18529 observations and 3 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 18529 observations read from the data set WORK._TMOUT_.
+NOTE: There were 2357 observations read from the data set WORK._TERMS_.
+NOTE: The data set WORK._TMOUT_ has 18529 observations and 4 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.03 seconds
+      cpu time            0.03 seconds
+ 
+ 
+ 
+NOTE: There were 3849 observations read from the data set EMWS1.TEXTCLUSTER_DOCS.
+NOTE: The data set WORK._DOCS_ has 3849 observations and 3 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.01 seconds
+ 
+ 
+NOTE: SQL view WORK._CMB has been defined.
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+ 
+ 
+ 
+NOTE: There were 18529 observations read from the data set WORK._TMOUT_.
+NOTE: There were 3849 observations read from the data set WORK._DOCS_.
+NOTE: There were 18529 observations read from the data set WORK._CMB.
+NOTE: The data set WORK._TFREQ has 6671 observations and 5 variables.
+NOTE: PROCEDURE SUMMARY used (Total process time):
+      real time           0.05 seconds
+      cpu time            0.04 seconds
+ 
+ 
+ 
+NOTE: There were 18529 observations read from the data set WORK._TMOUT_.
+NOTE: There were 3849 observations read from the data set WORK._DOCS_.
+NOTE: There were 18529 observations read from the data set WORK._CMB.
+NOTE: The data set WORK._SUM has 11 observations and 4 variables.
+NOTE: PROCEDURE SUMMARY used (Total process time):
+      real time           0.04 seconds
+      cpu time            0.04 seconds
+ 
+ 
+ 
+NOTE: There were 11 observations read from the data set WORK._SUM.
+NOTE: DATA statement used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+ 
+ 
+NOTE: Table WORK._SUM has been dropped.
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+ 
+ 
+ 
+NOTE: There were 6671 observations read from the data set WORK._TFREQ.
+NOTE: The data set WORK._TFREQ has 6671 observations and 5 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 6671 observations read from the data set WORK._TFREQ.
+NOTE: The data set WORK._UNQT has 240 observations and 3 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 240 observations read from the data set WORK._UNQT.
+NOTE: 57 observations with duplicate key values were deleted.
+NOTE: The data set WORK._UNQT has 183 observations and 1 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+ 
+ 
+NOTE: Table WORK._CLCDF created, with 978 rows and 3 columns.
+ 
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.01 seconds
+ 
+ 
+NOTE: Table WORK._UNQT has been dropped.
+NOTE: Table WORK._TFREQ has been dropped.
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+ 
+ 
+ 
+NOTE: There were 978 observations read from the data set WORK._CLCDF.
+NOTE: The data set WORK._CLCDF has 183 observations and 12 variables.
+NOTE: PROCEDURE TRANSPOSE used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.00 seconds
+ 
+ 
+ 
+NOTE: There were 183 observations read from the data set WORK._CLCDF.
+NOTE: The data set WORK._CLCDF has 183 observations and 22 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 183 observations read from the data set WORK._CLCDF.
+NOTE: The data set WORK._CLCDFTR has 978 observations and 4 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.01 seconds
+ 
+ 
+NOTE: Table WORK._CLCDF has been dropped.
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+ 
+ 
+ 
+NOTE: There were 978 observations read from the data set WORK._CLCDFTR.
+NOTE: The data set WORK._CLCDFTR has 978 observations and 4 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 978 observations read from the data set WORK._CLCDFTR.
+NOTE: The data set WORK._DESC_ has 10 observations and 2 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+ 
+ 
+NOTE: Table WORK._CLCDFTR has been dropped.
+NOTE: View WORK._CMB has been dropped.
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+ 
+ 
+ 
+NOTE: There were 10 observations read from the data set EMWS1.TEXTCLUSTER_CLUSTERS.
+NOTE: The data set EMWS1.TEXTCLUSTER_CLUSTERS has 10 observations and 15 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.07 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 10 observations read from the data set WORK._DESC_.
+NOTE: The data set WORK._DESC_ has 10 observations and 2 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 10 observations read from the data set EMWS1.TEXTCLUSTER_CLUSTERS.
+NOTE: There were 10 observations read from the data set WORK._DESC_.
+NOTE: The data set WORK._DESC_ has 10 observations and 16 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.03 seconds
+      cpu time            0.00 seconds
+ 
+ 
+ 
+NOTE: There were 10 observations read from the data set WORK._DESC_.
+NOTE: The data set EMWS1.TEXTCLUSTER_CLUSTERS has 10 observations and 16 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.07 seconds
+      cpu time            0.04 seconds
+ 
+ 
+NOTE: Fileref TEMP has been deassigned.
+ 
+NOTE: Variable TARGET is uninitialized.
+NOTE: The data set EMWS1.TEXTCLUSTER_EMINFO has 4 observations and 3 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.06 seconds
+      cpu time            0.01 seconds
+ 
+ 
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+ 
+ 
+ 
+NOTE: There were 1 observations read from the data set EMWS1.TEXTCLUSTER_TMCONFIG.
+NOTE: The data set EMWS1.TEXTCLUSTER_TMCONFIG has 1 observations and 32 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.05 seconds
+      cpu time            0.00 seconds
+ 
+ 
+ 
+NOTE: The data set WORK.EM_METACHANGE has 1 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 1 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 2 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 2 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 3 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 3 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 4 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+ 
+ 
+ 
+NOTE: There were 4 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 5 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 5 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 6 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+ 
+ 
+ 
+NOTE: There were 6 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 7 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 7 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 8 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+ 
+ 
+ 
+NOTE: There were 8 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 9 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 9 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 10 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 10 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 11 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 11 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 12 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+ 
+ 
+ 
+NOTE: There were 12 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 13 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 13 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 14 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 14 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 15 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 15 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 16 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+ 
+ 
+ 
+NOTE: There were 16 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 17 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 17 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 18 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 18 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 19 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 19 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 20 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+ 
+ 
+ 
+NOTE: There were 20 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 21 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 21 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 22 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+ 
+ 
+WARNING: No logical assign for filename TEMP.
+16994  *------------------------------------------------------------*;
+16995  * End TRAIN: TextCluster;
+16996  *------------------------------------------------------------*;
+ 
+16997  *------------------------------------------------------------*;
+16998  * Close any missing semi colons;
+16999  *------------------------------------------------------------*;
+17000  ;
+17001  ;
+17002  ;
+17003  ;
+17004  quit;
+17005  *------------------------------------------------------------*;
+17006  * Close any unbalanced quotes;
+17007  *------------------------------------------------------------*;
+17008  /*; *"; *'; */
+17009  ;
+17010  run;
+17011  quit;
+17012  /* Reset EM Options */
+17013  options formchar="|----|+|---+=|-/\<>*";
+17014  options nocenter ls=256 ps=10000;
+17015  goptions reset=all device=GIF NODISPLAY;
+ 
+17016  proc sort data=WORK.EM_METACHANGE;
+17017  by key uname;
+17018  run;
+ 
+NOTE: There were 22 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 22 observations and 9 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+ 
+ 
+17019  filename x "P:\Final Project\Twitter_Content_Engineering\Workspaces\EMWS1\TextCluster\CDELTA_TRAIN.sas";
+17020  data _null_;
+17021  file x;
+17022  put 'if upcase(NAME) = "TEXTCLUSTER_CLUSTER_" then do;';
+17023  put 'ROLE = "SEGMENT";';
+17024  put 'LEVEL = "NOMINAL";';
+17025  put 'end;';
+17026  put 'else ';
+17027  put 'if upcase(NAME) = "TEXTCLUSTER_PROB1" then do;';
+17028  put 'ROLE = "REJECTED";';
+17029  put 'end;';
+17030  put 'else ';
+17031  put 'if upcase(NAME) = "TEXTCLUSTER_PROB10" then do;';
+17032  put 'ROLE = "REJECTED";';
+17033  put 'end;';
+17034  put 'else ';
+17035  put 'if upcase(NAME) = "TEXTCLUSTER_PROB2" then do;';
+17036  put 'ROLE = "REJECTED";';
+17037  put 'end;';
+17038  put 'else ';
+17039  put 'if upcase(NAME) = "TEXTCLUSTER_PROB3" then do;';
+17040  put 'ROLE = "REJECTED";';
+17041  put 'end;';
+17042  put 'else ';
+17043  put 'if upcase(NAME) = "TEXTCLUSTER_PROB4" then do;';
+17044  put 'ROLE = "REJECTED";';
+17045  put 'end;';
+17046  put 'else ';
+17047  put 'if upcase(NAME) = "TEXTCLUSTER_PROB5" then do;';
+17048  put 'ROLE = "REJECTED";';
+17049  put 'end;';
+17050  put 'else ';
+17051  put 'if upcase(NAME) = "TEXTCLUSTER_PROB6" then do;';
+17052  put 'ROLE = "REJECTED";';
+17053  put 'end;';
+17054  put 'else ';
+17055  put 'if upcase(NAME) = "TEXTCLUSTER_PROB7" then do;';
+17056  put 'ROLE = "REJECTED";';
+17057  put 'end;';
+17058  put 'else ';
+17059  put 'if upcase(NAME) = "TEXTCLUSTER_PROB8" then do;';
+17060  put 'ROLE = "REJECTED";';
+17061  put 'end;';
+17062  put 'else ';
+17063  put 'if upcase(NAME) = "TEXTCLUSTER_PROB9" then do;';
+17064  put 'ROLE = "REJECTED";';
+17065  put 'end;';
+17066  put 'else ';
+17067  put 'if upcase(NAME) = "TEXTCLUSTER_SVD1" then do;';
+17068  put 'ROLE = "INPUT";';
+17069  put 'LEVEL = "INTERVAL";';
+17070  put 'end;';
+17071  put 'else ';
+17072  put 'if upcase(NAME) = "TEXTCLUSTER_SVD10" then do;';
+17073  put 'ROLE = "INPUT";';
+17074  put 'LEVEL = "INTERVAL";';
+17075  put 'end;';
+17076  put 'else ';
+17077  put 'if upcase(NAME) = "TEXTCLUSTER_SVD11" then do;';
+17078  put 'ROLE = "INPUT";';
+17079  put 'LEVEL = "INTERVAL";';
+17080  put 'end;';
+17081  put 'else ';
+17082  put 'if upcase(NAME) = "TEXTCLUSTER_SVD2" then do;';
+17083  put 'ROLE = "INPUT";';
+17084  put 'LEVEL = "INTERVAL";';
+17085  put 'end;';
+17086  put 'else ';
+17087  put 'if upcase(NAME) = "TEXTCLUSTER_SVD3" then do;';
+17088  put 'ROLE = "INPUT";';
+17089  put 'LEVEL = "INTERVAL";';
+17090  put 'end;';
+17091  put 'else ';
+17092  put 'if upcase(NAME) = "TEXTCLUSTER_SVD4" then do;';
+17093  put 'ROLE = "INPUT";';
+17094  put 'LEVEL = "INTERVAL";';
+17095  put 'end;';
+17096  put 'else ';
+17097  put 'if upcase(NAME) = "TEXTCLUSTER_SVD5" then do;';
+17098  put 'ROLE = "INPUT";';
+17099  put 'LEVEL = "INTERVAL";';
+17100  put 'end;';
+17101  put 'else ';
+17102  put 'if upcase(NAME) = "TEXTCLUSTER_SVD6" then do;';
+17103  put 'ROLE = "INPUT";';
+17104  put 'LEVEL = "INTERVAL";';
+17105  put 'end;';
+17106  put 'else ';
+17107  put 'if upcase(NAME) = "TEXTCLUSTER_SVD7" then do;';
+17108  put 'ROLE = "INPUT";';
+17109  put 'LEVEL = "INTERVAL";';
+17110  put 'end;';
+17111  put 'else ';
+17112  put 'if upcase(NAME) = "TEXTCLUSTER_SVD8" then do;';
+17113  put 'ROLE = "INPUT";';
+17114  put 'LEVEL = "INTERVAL";';
+17115  put 'end;';
+17116  put 'else ';
+17117  put 'if upcase(NAME) = "TEXTCLUSTER_SVD9" then do;';
+17118  put 'ROLE = "INPUT";';
+17119  put 'LEVEL = "INTERVAL";';
+17120  put 'end;';
+17121  run;
+ 
+NOTE: The file X is:
+      Filename=P:\Final Project\Twitter_Content_Engineering\Workspaces\EMWS1\TextCluster\CDELTA_TRAIN.sas,
+      RECFM=V,LRECL=32767,File Size (bytes)=0,
+      Last Modified=23Apr2020:10:28:01,
+      Create Time=23Apr2020:01:48:05
+ 
+NOTE: 99 records were written to the file X.
+      The minimum record length was 4.
+      The maximum record length was 49.
+NOTE: DATA statement used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.00 seconds
+ 
+ 
+17122  filename x;
+NOTE: Fileref X has been deassigned.
+ 
+*------------------------------------------------------------*
+* Score Log
+Date:                April 23, 2020
+Time:                10:28:02
+*------------------------------------------------------------*
+17224  %let EMEXCEPTIONSTRING=;
+17225  *------------------------------------------------------------*;
+17226  * SCORE: TextCluster;
+17227  *------------------------------------------------------------*;
+17228  %let EM_ACTION = SCORE;
+17229  %let syscc = 0;
+17230  %macro main();
+17231
+17232     %if %upcase(&EM_ACTION) eq CREATE %then %do;
+17233        filename temp catalog 'sashelp.emtxtext.cluster_create.source';
+17234        %include temp;
+17235        %create();
+17236     %end;
+17237     %if %upcase(&EM_ACTION) eq TRAIN %then %do;
+17238        filename temp catalog 'sashelp.emtxtext.cluster_train.source';
+17239        %include temp;
+17240        %train();
+17241     %end;
+17242     %if %upcase(&EM_ACTION) eq REPORT %then %do;
+17243        filename temp catalog 'sashelp.emtxtext.cluster_report.source';
+17244        %include temp;
+17245        %report();
+17246     %end;
+17247     %if %upcase(&EM_ACTION) eq SCORE %then %do;
+17248        filename temp catalog 'sashelp.emtxtext.cluster_score.source';
+17249        %include temp;
+17250        %score();
+17251     %end;
+17252  %mend main;
+17253
+17254  %main();
+NOTE: %INCLUDE (level 1) file TEMP is file SASHELP.EMTXTEXT.CLUSTER_SCORE.SOURCE.
+17255 +%macro tmc_score(import_ds=,configdata=,export_ds=,term_ds=,export_out=,clusters_ds=,svdu=,svds=,
+17256 +    import_out=,em_outstat=,prefixstring=,ocluster=,ndescterms=,ftmout=,fterms=,hier=);
+17257 +  %if &import_ds ne %then %do;
+17259 +    %let syscc=0;
+17261 +    %tmc_doc_score(import=&import_ds,export=&export_ds,emoutstat=&em_outstat,
+17262 +                termds=&term_ds,clusters=&clusters_ds,configds=&configdata,
+17263 +                _scrout=&import_out, svd_u=&svdu, svd_s=&svds, prefix=&prefixstring,
+17264 +                outclusters=&ocluster, descterms=&ndescterms, filterterms=&fterms,
+17265 +                filtertmout=&ftmout, hierds=&hier);
+17267 +  %end;
+17269 +%mend tmc_score;
+17270 +%macro score();
+17272 +    %global last_parse_node last_filter_node last_prescore_node server_err
+17273 +      parsevar EM_SASMSG ;
+17274 +    %let syscc=0;
+17275 +    %if ^%symexist(tm_debug) %then %let tm_debug=0;
+17276 +    /*use saved version of em_info in case macro is not populated*/
+17277 +    %em_getname(key=last_tm_nodes, type=data);
+17279 +    filename temp catalog 'sashelp.emtxtext.tm_get_last_filter.source';
+17280 +    %include temp;
+17281 +    %tm_get_last_filter(eminfo=&em_user_last_tm_nodes,em_lib=&em_lib,
+17282 +                        em_variableset=&em_data_variableset);
+17283 +    %if &EMEXCEPTIONSTRING ne %then %goto end_cluster_score;
+17284 +    %let lastparsenode=&last_parse_node;
+17285 +    %let lastfilternode=&last_filter_node;
+17286 +    %let lastprescore=&last_prescore_node;
+17287 +    %let filt_node=;
+17289 +   %em_getname(key=terms, type=data);
+17290 +   %em_getname(key=docs, type=data);
+17291 +   %em_getname(key=clusters, type=data);
+17292 +   %em_getname(key=svd_u, type=data);
+17293 +   %em_getname(key=svd_s, type=data);
+17294 +   %em_getname(key=emoutstat, type=data);
+17295 +   %em_getname(key=tmconfig, type=data);
+17297 +   %em_getname(key=tmout, type=data);
+17298 +   %em_getname(key=validout, type=data);
+17299 +   %em_getname(key=testout, type=data);
+17300 +   %em_getname(key=scoreout, type=data);
+17301 +   %em_getname(key=PRESCORECODE, type=file, extension=sas);
+17302 +   %let systmutil=;
+17304 +    filename temp catalog 'sashelp.emtxtext.tm_data2code.source';
+17305 +    %include temp;
+17306 +    filename temp catalog 'sashelp.emtext.tmemclus.source';
+17307 +    %include temp;
+17308 +    filename temp catalog 'sashelp.emtext.tmpred.source';
+17309 +    %include temp;
+17310 +    filename temp catalog 'sashelp.emtext.tmsort.source';
+17311 +    %include temp;
+17312 +    filename temp catalog 'sashelp.emtxtext.tmc_doc_score.source';
+17313 +    %include temp;
+17314 +    filename temp catalog 'sashelp.emtext.tmsvd.source';
+17315 +    %include temp;
+17316 +    filename temp catalog 'sashelp.emtext.tmfast.source';
+17317 +    %include temp;
+17319 +   %let EM_PUBLISHCODE = PUBLISH;
+17320 +   %let EM_SCORECODEFORMAT = DATASTEP;
+17321 +   %let overwrite_pre = ;
+17323 +   %let lastprescore=%trim(%left(&lastprescore));
+17325 +   /* Create indexed term table for writing out score code */
+17326 +   proc sql noprint;
+17327 +       select count(*) into :svdkeep
+17328 +       from &em_user_svd_s
+17329 +       where keep=1;
+17330 +   create table _clusterms as
+17331 +      select key, term, role, keep, freq, numdocs, parent, _ispar, weight from &em_user_terms;
+17333 +   data _filter_tmout;
+17334 +      set &EM_LIB..&lastfilternode._tmout;
+17335 +   run;
+17337 +   %tmc_score(import_ds=&em_import_data,export_ds=&em_export_train,
+17338 +              import_out=_filter_tmout,
+17339 +              export_out=&EM_export_transaction,
+17340 +              term_ds=_clusterms,
+17341 +              clusters_ds=&em_user_clusters,
+17342 +              svdu=&em_user_svd_u,
+17343 +              svds=&em_user_svd_s,
+17344 +              em_outstat=&em_user_emoutstat,
+17345 +              configdata=&em_user_tmconfig,
+17346 +              prefixstring=&EM_NODEID,
+17347 +              ocluster=&em_user_clusters,
+17348 +              ndescterms=&em_property_ndescterms,
+17349 +              fterms=&EM_LIB..&lastfilternode._terms,
+17350 +              ftmout=&EM_LIB..&lastfilternode._tmout,
+17351 +              hier=&em_user_hierds);
+17353 +   %tmc_score(import_ds=&em_import_validate,export_ds=&em_export_validate,
+17354 +              export_out=&EM_USER_validout,
+17355 +              import_out=&EM_LIB..&lastfilternode._validout,
+17356 +              term_ds=_clusterms,
+17357 +              clusters_ds=&em_user_clusters,
+17358 +              svdu=&em_user_svd_u,
+17359 +              svds=&em_user_svd_s,
+17360 +              em_outstat=&em_user_emoutstat,
+17361 +              configdata=&em_user_tmconfig,
+17362 +              prefixstring=&EM_NODEID);
+17363 +   %tmc_score(import_ds=&em_import_test,export_ds=&em_export_test,
+17364 +              export_out=&EM_USER_testout,
+17365 +              import_out=&EM_LIB..&lastfilternode._testout,
+17366 +              term_ds=_clusterms,
+17367 +              clusters_ds=&em_user_clusters,
+17368 +              svdu=&em_user_svd_u,
+17369 +              svds=&em_user_svd_s,
+17370 +              em_outstat=&em_user_emoutstat,
+17371 +              configdata=&em_user_tmconfig,
+17372 +              prefixstring=&EM_NODEID);
+17374 +   %if &syscc>4 %then %do;
+17375 +       %let syscc=0;
+17376 +       %goto end_cluster_score;
+17377 +   %end;
+17379 +   * path of the diagram ;
+17380 +   %let emwspath = ;
+17381 +   data _null_;
+17382 +      call symput("emwspath", strip(pathname("&EM_LIB")));
+17383 +   run;
+17385 +   filename pre "&EM_USER_PRESCORECODE";
+17386 +   data _null_;
+17387 +       file pre;
+17388 +       put 'filename temp catalog "sashelp.emtext.tmemclus.source";';
+17389 +       put '%include temp;';
+17390 +       put 'filename temp catalog "sashelp.emtext.tmpred.source";';
+17391 +       put '%include temp;';
+17392 +       put 'filename temp catalog "sashelp.emtxtext.tmc_doc_score.source";';
+17393 +       put '%include temp;';
+17394 +       put 'filename temp catalog "sashelp.emtext.tmsort.source";';
+17395 +       put '%include temp;';
+17396 +       put 'filename temp catalog "sashelp.emtext.tmsvd.source";';
+17397 +       put '%include temp;';
+17398 +       put 'filename temp catalog "sashelp.emtext.tmfast.source";';
+17399 +       put '%include temp;';
+17400 +       put 'filename temp;';
+17401 +   run;
+17404 +   /* We need to use last prescore */
+17405 +   %if &lastprescore ne %then %do;
+17406 +      %let tmprescoreFile = %bquote(&emwspath)&em_dsep&lastprescore&em_dsep.PRESCORECODE.sas;
+17407 +      filename tmpre "&tmprescoreFile";
+17408 +      %em_copyfile(infref=tmpre, outfref=pre, append=Y);
+17409 +      filename tmpre;
+17410 +   %end;
+17412 +   data _codeclusters;
+17413 +        set &em_user_clusters (drop=clus_desc);
+17414 +   run;
+17416 +     %if not %symexist(em_term_loc) %then %do;
+17417 +       %let em_term_loc = %bquote(%sysfunc(pathname(&EM_LIB)));
+17418 +         libname termloc "&em_term_loc";
+17420 +      %let scored_terms = termloc.&lastfilternode._filtterms;
+17421 +       %let scored_clust = termloc.&EM_NODEID._clusters;
+17422 +       %let scored_config = termloc.&EM_NODEID._tmconfig;
+17423 +       %let scored_svd_u = termloc.&EM_NODEID._svd_u;
+17424 +       %let scored_svd_s= termloc.&EM_NODEID._svd_s;
+17426 +       %if &em_property_algorithm=1.0 %then  %do;
+17427 +          %let scored_emoutstat= termloc.&EM_NODEID._emoutstat;
+17428 +       %end;
+17430 +   %end;
+17431 +   %else %do; /* Write out data sets to external directory */
+17432 +       libname termloc "&em_term_loc";
+17433 +        %if %sysfunc(libref(termloc)) ne 0 %then %do;
+17434 +           %let  EMEXCEPTIONSTRING = EMTOOL.EMTERMLOC,&em_term_loc;
+17435 +           %goto end_cluster_score;
+17436 +       %end;
+17438 +      /* copy datasets to use for prescore code*/
+17439 +       data termloc.&EM_LIB._&EM_NODEID._CLUSTERS;
+17440 +         set _codeclusters;
+17441 +       run;
+17443 +       data termloc.&EM_LIB._&EM_NODEID._svd_u;
+17444 +         set &em_user_svd_u;
+17445 +       run;
+17447 +       data termloc.&EM_LIB._&EM_NODEID._svd_s;
+17448 +         set &em_user_svd_s;
+17449 +       run;
+17451 +       data termloc.&EM_LIB._&EM_NODEID._tmconfig;
+17452 +         set &em_user_tmconfig;
+17453 +       run;
+17455 +       %let scored_terms = termloc.&EM_LIB._&lastfilternode._filtterms;
+17456 +       %let scored_clust = termloc.&EM_LIB._&EM_NODEID._CLUSTERS;
+17457 +       %let scored_config = termloc.&EM_LIB._&EM_NODEID._tmconfig;
+17458 +       %let scored_svd_u = termloc.&EM_LIB._&EM_NODEID._svd_u;
+17459 +       %let scored_svd_s= termloc.&EM_LIB._&EM_NODEID._svd_s;
+17461 +       %if &em_property_algorithm=1.0 %then  %do;
+17462 +         data termloc.&EM_LIB._&EM_NODEID._emoutstat;
+17463 +         set &em_user_emoutstat;
+17464 +         run;
+17465 +           %let scored_emoutstat= termloc.&EM_LIB._&EM_NODEID._emoutstat;
+17466 +       %end;
+17467 +   %end;
+17471 +   %let _score_append=;
+17473 +   * Now save code, if necessary, for search phrase;
+17474 +   filename _tmscore "&EM_FILE_EMPUBLISHSCORECODE";
+17475 +   %if &em_property_algorithm=1.0 %then %do;
+17476 +   data _NULL_;
+17477 +     file _tmscore;
+17478 +     length string $200;
+17479 +     string ='%tmc_doc_score(import='||'&em_score_output'||",export=work._newexport,";
+17480 +     put string;
+17481 +     string="      termds=&scored_terms, configds=&scored_config,";
+17482 +     put string;
+17483 +     string= "      clusters=&scored_clust, emoutstat=&scored_emoutstat, ";
+17484 +     put string;
+17485 +     string = "      _scrout=work.&lastfilternode._out, svd_u=&scored_svd_u, svd_s=&scored_svd_s, prefix=&em_nodeid);";
+17486 +     put string;
+17487 +     string='data &em_score_output; set work._newexport;';
+17488 +     put string;
+17489 +    run;
+17490 +    %end;
+17491 +    %else %do;
+17492 +    data _NULL_;
+17493 +     file _tmscore;
+17494 +     string= '%'||"tmc_doc_score(import="||'&em_score_output'||",export=work._newexport,";
+17495 +     put string;
+17496 +     put "      termds=&scored_terms,configds=&scored_config,";
+17497 +     put "      clusters=&scored_clust, ";
+17498 +     put "      _scrout=work.&lastfilternode._out, svd_u=&scored_svd_u, svd_s=&scored_svd_s, prefix=&em_nodeid);";
+17499 +     put 'data &em_score_output; set work._newexport;';
+17500 +    run;
+17501 +    %end;
+17502 +   filename _tmscore;
+17504 +%end_cluster_score:
+17505 +    filename temp;
+17506 +    %if &tm_debug =0 %then %do;
+17507 +    proc sql noprint;
+17508 +        drop table _clusterms;
+17509 +        drop table _filter_tmout;
+17510 +        drop table _codeclusters;
+17511 +    quit;
+17512 +    %end;
+17514 +%mend score;
+NOTE: %INCLUDE (level 1) ending.
+NOTE: %INCLUDE (level 1) file TEMP is file SASHELP.EMTXTEXT.TM_GET_LAST_FILTER.SOURCE.
+17516 +/* ****************************************************************
+17517 + * Copyright (C) 2009 by SAS Institute Inc., Cary, NC 27513
+17518 + *
+17519 + * Name:             tm_get_last_filter.sas
+17520 + * Product:          SAS Text Miner
+17521 + * Language:         Sas
+17522 + * Script:
+17523 + *
+17524 + * Usage:
+17525 + *
+17526 + * Purpose:  macro to get the last filter node and the last parse node in the
+17527 + *   diagram that corresponds to the current parse variable.  If there is no filter
+17528 + *   node, the filter node is set to the last parse node.
+17529 + *
+17530 + *
+17531 + *
+17532 + * History:
+17533 + * 14Aug09 Initial Coding
+17534 + *
+17535 + * Notes:
+17536 + *    Returns an error in the following cases:
+17537 + *      1. There is no preceding parse node.
+17538 + *      2. There is no parse node with the current parse variable.
+17539 + *
+17540 + * Last Modified By:
+17541 + * Last Modified On: Wed Sep 23 15:35:04 2009
+17542 + *
+17543 + * End
+17544 + * ************************************************************** */
+17545 +%macro tm_get_last_filter(eminfo=,em_lib=, em_variableset=);
+17546 +   %let last_parse_node=;
+17547 +   %let last_filter_node=;
+17548 +   %let last_prescore_node=;
+17549 +   %let server_err=;
+17550 +   %let EMEXCEPTIONSTRING=;
+17551 +   %let syscc=0;
+17552 +
+17553 +    /* verify that setinit for SAS Text Miner is currently active */
+17554 +    %if %sysfunc(sysprod(PRODNUM107)) ne 1 %then %do;
+17555 +       %let EMEXCEPTIONSTRING = EMTOOL.NOTMLICENSE;
+17556 +        %goto end_macro;
+17557 +        %end;
+17558 +
+17559 +
+17560 +    * find last filter or text parse node if no filter node. ;
+17561 +   %if %sysfunc(exist(&eminfo)) %then %do;
+17562 +      proc sql noprint;
+17563 +      select data into :last_parse_node from &eminfo where key="LastTextParsing";
+17564 +         select data into :last_filter_node from &eminfo where key="LastTextFilter";
+17565 +         select data into :last_prescore_node from &eminfo where kupcase(key)="PRESCORECODE";
+17566 +      quit;
+17567 +
+17568 +   %end;
+17569 +
+17570 +   %if &last_parse_node= %then %do;
+17571 +      %let EMEXCEPTIONSTRING = EMTOOL.NOPARSINGNODE;
+17572 +      %goto end_macro;
+17573 +      %end;
+17574 +
+17575 +   %else %if &last_filter_node= %then %let last_filter_node = %ktrim(&last_parse_node);
+17576 +   %else %let last_filter_node = %ktrim(&last_filter_node);
+17577 +   %let last_parse_node = %ktrim(&last_parse_node);
+17578 +
+17579 +   * Check to make sure parse variable is present and still exists;
+17580 +   %let parsevar = ;
+17581 +   proc sql noprint;
+17582 +    select parsevar into :parsevar
+17583 +    from &em_lib..&last_filter_node._tmconfig;
+17584 +    quit;
+17585 +
+17586 +    *check for dropped parsevar on input dataset;
+17587 +       %let parsevarOK= ;
+17588 +       %let parsevarN=%kupcase(%ktrim(&parsevar));
+17589 +       data _null_;
+17590 +         set &em_variableset(where=(kupcase(NAME)="&parsevarN" and USE in('Y' 'D')));
+17591 +         if (ROLE='TEXT' or ROLE='TEXTLOC') then call symput('parsevarOK', strip(ROLE));
+17592 +         run;
+17593 +       %if(&parsevarOK eq ) %then %do;
+17594 +          %let EMEXCEPTIONSTRING = EMTOOL.NOPARSINGVAR;
+17595 +          %goto end_macro;
+17596 +          %end;
+17597 +%end_macro:
+17598 +
+17599 +%mend tm_get_last_filter;
+NOTE: %INCLUDE (level 1) ending.
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+ 
+ 
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+ 
+ 
+ 
+NOTE: There were 1 observations read from the data set EMWS1.TEXTCLUSTER_VARIABLESET.
+      WHERE (KUPCASE(NAME)='MESSAGE') and USE in ('D', 'Y');
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+ 
+ 
+NOTE: %INCLUDE (level 1) file TEMP is file SASHELP.EMTXTEXT.TM_DATA2CODE.SOURCE.
+17600 +/* ****************************************************************
+17601 + * Copyright (C) 2009 by SAS Institute Inc., Cary, NC 27513
+17602 + *
+17603 + * Name:             tm_data2code.sas
+17604 + * Product:          SAS Text Miner
+17605 + * Language:         Sas
+17606 + * Script:
+17607 + *
+17608 + * Usage:  %tm_data2code(data=, outdata=WORK.DATA);
+17609 + *
+17610 + * Purpose:          To do a data2code (like %em_data2code()) but allow the input data
+17611 + *  to be view or data.
+17612 + *
+17613 + *    PARAMETERS:
+17614 + *        DATA        = data set
+17615 + *        OUTDATA     = out data set
+17616 + *        OUTFILE     = file where to saved the code
+17617 + *        APPEND      = append (Y/N)
+17618 + * History:
+17619 + * 11Jun09 Initial Coding
+17620 + *
+17621 + * Notes:
+17622 + *
+17623 + * Last Modified By:
+17624 + * Last Modified On: Thu Jul 23 11:00:06 2009
+17625 + *
+17626 + * End
+17627 + * ************************************************************** */
+17628 +%macro tm_data2code(data=, outdata=WORK.DATA, outfile=, append=N);
+17629 +%if &data eq %then %do;
+17630 +   %put ERROR: Data set not defined;
+17631 +   %end;
+17632 +%else %do;
+17633 +   %if (^%sysfunc(exist(&data)) and ^%sysfunc(exist(&data, view))) %then %do;
+17634 +       %put ERROR: Data set does not exist;
+17635 +       %end;
+17636 +   %else %do;
+17637 +      %global em_data em_outdata em_codefile em_append;
+17638 +      %let em_data=&data;
+17639 +      %let em_outdata=&outdata;
+17640 +      %let em_codefile=&outfile;
+17641 +      %let em_append=&append;
+17642 +      proc display c=sashelp.emutil.data2code.scl; run;
+17643 +      %end;
+17644 +   %end;
+17645 +%mend;
+NOTE: %INCLUDE (level 1) ending.
+NOTE: %INCLUDE (level 1) file TEMP is file SASHELP.EMTEXT.TMEMCLUS.SOURCE.
+17646 +
+17647 + /*
+17648 +
+17649 +  Macro:   tmemclus.sas
+17650 +  Purpose: Call proc emclus with given defaults and parameters.
+17651 +  Syntax:  %tmemclus(data=, role=, clusters=, seed=,
+17652 +                   outstat=, out=, vars=, cov=, iter=, secclus=,
+17653 +                   seciter=, min=, method=, eps=, init=, print=,
+17654 +                   p=, outliers=, decvar=, initstd=, dist=,
+17655 +                   secstd=, nobs=, threads=);
+17656 +  Required Parameters:  data=      The input data set.
+17657 +                        role=      Train or score
+17658 +                        clusters=  The number of primary clusters
+17659 +
+17660 +  Optional Parameters:  vars=      Variables to be used
+17661 +                   cov=       Type of covariance matrix
+17662 +                   iter=      Number of EM iterations
+17663 +                   secclus    Number of secondary clusters
+17664 +                   seciter    Number of k-means iterations
+17665 +                   min=       Minimum number of obs in a cluster
+17666 +                   method=    Standard or scaled
+17667 +                   eps=       Stopping tolerance
+17668 +                   init=      Random, Fastclus, or Emclus
+17669 +                   print=     All, last, or none
+17670 +                   p=
+17671 +                   outliers=  Keep, cluster, or ignore
+17672 +                   outstat=   Name of OUTSTAT data set
+17673 +                   out=       Name of OUT data set
+17674 +                   seed=      Name of SEED data set
+17675 +                   decvar=    Proportion to decrease variances
+17676 +                   initstd=   Initial standard deviation
+17677 +                   dist=      Minimum distance between clusters
+17678 +                   secstd=    Secondary cluster max std dev.
+17679 +                   nobs=      Number of obs read in each iteration
+17680 +  History:
+17681 +  2001/01/16 - Bill Wheeler - Initial Coding.
+17682 +  2001/11/29 - Bill Wheeler - Updated for version 8 or 9
+17683 +*/
+17684 +%MACRO tmemclus(data=, role=, clusters=, seed=,
+17685 + outstat=, out=, vars=, cov=, iter=, secclus=,
+17686 + seciter=, min=, method=, eps=, init=, print=,
+17687 + p=, outliers=, decvar=, initstd=, dist=, secstd=, nobs=, threads=);
+17688 +
+17689 + %local saveout saveseed op1 op2 op3 op4;
+17690 +
+17691 + %LET saveout = &out;
+17692 + %LET saveseed = &outstat;
+17693 +
+17694 + /* defaults */
+17695 + %if &role= %then %let role = TRAIN;
+17696 + %if &seed ne %then %let seed = seed=&seed;
+17697 + %if &vars= %then %let var = ;
+17698 + %else %let var = var &vars;
+17699 + %if &cov ne %then %let cov = cov = &cov;
+17700 + %if &iter ne %then %let iter = iter = &iter;
+17701 + %if &init ne %then %let init = init = &init;
+17702 + %if &eps ne  %then %let eps = eps = &eps;
+17703 + %if &min ne %then %let min = min = &min;
+17704 + %if &seciter ne %then %let seciter = seciter = &seciter;
+17705 + %if &print ne %then %let print = print = &print;
+17706 + %if &p ne %then %let p = p = &p;
+17707 + %if &outliers ne %then %let outliers = outliers = &outliers;
+17708 + %if &method ne %then %let method = method = &method;
+17709 + %if &decvar ne %then %let decvar = decvar = &decvar;
+17710 + %if &outstat ne %then %let outstat = outstat = &outstat;
+17711 + %if &out ne %then %let out = out = &out;
+17712 + %if (&threads >= 0)  %then %let threads = threads = &threads;
+17713 + %else %let threads = ;
+17714 +
+17715 + %LET op1 = ;
+17716 + %LET op2 = ;
+17717 + %LET op3 = ;
+17718 + %LET op4 = ;
+17719 + %if ^(&initstd=) %then %let op1 = %str(initstd = &initstd);
+17720 + %if ^(&dist=) %then %let op2 = %str(dist = &dist);
+17721 + %if ^(&secstd=) %then %let op3 = %str(secstd = &secstd);
+17722 + %if ^(&nobs=) %then %let op4 = %str(nobs = &nobs);
+17723 +
+17724 +
+17725 + %IF &SYSVER < 9 %THEN %DO;
+17726 +    %LET cov = ;
+17727 +    %LET decvar = ;
+17728 +    %LET outliers = ;
+17729 +    %LET out = ;
+17730 + %END;
+17731 +
+17732 +
+17733 + %if %upcase(&role) = TRAIN %then
+17734 + %do;
+17735 +   proc emclus data = &data
+17736 +   clusters = &clusters
+17737 +   &seed
+17738 +   &outstat
+17739 +   &out
+17740 +   &init
+17741 +   &eps
+17742 +   &method
+17743 +   &secclus
+17744 +   &min
+17745 +   &print
+17746 +   &outliers
+17747 +   &iter
+17748 +   &op1 &op2
+17749 +   &op3 &op4
+17750 +   &decvar
+17751 +   &cov
+17752 +   &threads
+17753 +   ;
+17754 +   &var;
+17755 + %end;
+17756 + %else
+17757 +  %do;
+17758 +    proc emclus data = &data
+17759 +    role = score
+17760 +    clusters = &clusters
+17761 +    &seed
+17762 +    &out
+17763 +    &cov
+17764 +    ;
+17765 +    &var;
+17766 +  %end;
+17767 +
+17768 + %IF &SYSVER < 9 and &saveout ^= %THEN %DO;
+17769 +   proc emclus data = &data
+17770 +   role = score
+17771 +   clusters = &clusters
+17772 +   seed = &saveseed
+17773 +   &saveout
+17774 +   ;
+17775 +   &var;
+17776 + %END;
+17777 +
+17778 +
+17779 +%MEND tmemclus;
+NOTE: %INCLUDE (level 1) ending.
+NOTE: %INCLUDE (level 1) file TEMP is file SASHELP.EMTEXT.TMPRED.SOURCE.
+17780 +
+17781 +/*
+17782 +  Macro: tmpred(inds,outds,clusters,type=,ignore=,freqDS=)
+17783 +
+17784 +  Description: This macro will take output from
+17785 +     emclus and generate predicted
+17786 +      predicted clusters.
+17787 +
+17788 +  Parms: inds - input data set, produced by emclus.
+17789 +   outds - data set with clusters created by this macro.
+17790 +   clusters - number of clusters that should be on this data set
+17791 +   type - valid values: 'max' or 'prob'.  Max will just take the
+17792 +      cluster with the highest probability as the predicted cluster.
+17793 +      In the case of a tie the first cluster with that value will
+17794 +       selected.
+17795 +      Prob will attempt to select multiple clusters based on
+17796 +      how many clusters were requested.  That is if 3 clusters
+17797 +      were requested, any cluster with prob>1/3 will be selected
+17798 +      as the predicted cluster. THIS OPTION IS UNTESTED.
+17799 +*/
+17800 +
+17801 +%macro tmpred(inds,outds,clusters,type=, ignore=0, freqDS=, compress=1);
+17802 +
+17803 +  %local _str newfreqDS _flag;
+17804 +
+17805 +  * set the optional arguments;
+17806 +  %if &type= %then %let type=max;
+17807 +  %if &ignore = 1 %then %let
+17808 +    _str = if _CLUSTER_ = &clusters then _CLUSTER_ = .;
+17809 +  %else %let _str = ;
+17810 +  %if %str(&freqDS) ^= %str() %then %do;
+17811 +   %let newfreqDS = &freqDS(keep=_c1-_c&clusters);
+17812 +   %let _flag = 1;
+17813 +  %end;
+17814 +  %else %let _flag = 0;
+17815 +
+17816 +  %if &compress = 1 %then %let compress = compress=Y;
+17817 +  %else %let compress = ;
+17818 +
+17819 +  data &outds(&compress drop=_c1-_c&clusters)
+17820 +    %if &_flag = 1 %then %do;
+17821 +    &newfreqDS
+17822 +    %end;
+17823 +    ;
+17824 +    set &inds end=eof;
+17825 +   * array for holding all probabilities;
+17826 +    array _p prob1--prob&clusters;
+17827 +    array _c(&clusters);
+17828 +    retain _c 0;
+17829 +   * get rid of working columns;
+17830 +    drop _max_ _i /*prob1--prob&clusters*/ _WARN_;
+17831 +    /* keep the largest probability and the cluster */
+17832 +    _max_ = 0;
+17833 +    do _i = 1 to &clusters;
+17834 +      if _p(_i) > _max_ then do;
+17835 +        _max_ = _p(_i);
+17836 +        _CLUSTER_ = _i;
+17837 +      end;
+17838 +    end;
+17839 +    if (_CLUSTER_ >= 1) and (_CLUSTER_ <= &clusters) then
+17840 +      _c(_CLUSTER_) = _c(_CLUSTER_) + 1;
+17841 +    else _CLUSTER_ = .;
+17842 +    &_str;
+17843 +    %if &_flag = 1 %then %do;
+17844 +      if eof then do;
+17845 +        output &freqDS;
+17846 +                output &outDS;
+17847 +          end;
+17848 +          else output &outDS;
+17849 +        %end;
+17850 +
+17851 +    run;
+17852 +%mend tmpred;
+NOTE: %INCLUDE (level 1) ending.
+NOTE: %INCLUDE (level 1) file TEMP is file SASHELP.EMTEXT.TMSORT.SOURCE.
+17853 + /*
+17854 +PROC SORT macro
+17855 +
+17856 +%tmsort(data=, out=, by=);
+17857 +
+17858 +data=      - name of input data set (outtree data set from PROC CLUSTER)
+17859 +out=       - name of the output data set
+17860 +by=        - by statement
+17861 +options=   - proc options
+17862 +*/
+17863 +
+17864 +%macro tmsort(data=, out=, by=, options=, threads=THREADS);
+17865 +  %if %BQUOTE(&out) ^= %then %let out = out =  &out;
+17866 +  %if &SYSVER < 9 %then %let threads = ;
+17867 +
+17868 +  proc sort data = %STR(&data) &threads &options
+17869 +    &out;
+17870 +    by &by;
+17871 +  run;
+17872 +
+17873 +%mend tmsort;
+NOTE: %INCLUDE (level 1) ending.
+NOTE: %INCLUDE (level 1) file TEMP is file SASHELP.EMTXTEXT.TMC_DOC_SCORE.SOURCE.
+17874 +/*****************************************************************************
+17875 +*
+17876 +* tmc_doc_score
+17877 +*
+17878 +*  import  =  the doc data set of _document_ ids's as input
+17879 +*  export = the new doc dataset with the svd dimensions and cluster results as output
+17880 +*  termds = the terms table as input
+17881 +*  clusters = input dataset of clusters from train
+17882 +*  emoutstat = input dataset of seeds from training
+17883 +*  _scrout = input OUT data set to be scored, may be trimmed based on conent of termds
+17884 +*  svd_u = input singular vectors
+17885 +
+17886 +
+17887 +*  svd_s = input singular values
+17888 +*  prefxi = variable prefix string identifier.
+17889 +*
+17890 +**************************************************************************************/
+17891 +
+17892 +%macro tmc_doc_score(import=,export=,termds=,export_out=,clusters=,emoutstat=,
+17893 +                 _scrout=,svd_u=,svd_s=,configds=,prefix=, outclusters=,hierds=,
+17894 +                filterterms=,filtertmout=, descterms=);
+17895 +
+17896 +   %if ^%symexist(tm_debug) %then %let tm_debug=0;
+17897 +
+17898 +    proc sql noprint;
+17899 +        select cellwgt into: cellwgt
+17900 +            from &configds;
+17901 +        select clus_alg into: algorithm
+17902 +            from &configds;
+17903 +        select parseVar into :textvar
+17904 +            from &configds;
+17905 +        select count(*) into :nclus
+17906 +            from &clusters;
+17907 +        select count(*) into :svdkeep
+17908 +            from &svd_s
+17909 +            where keep=1;
+17910 +    quit;
+17911 +
+17912 +    %let svdkeep=%left(&svdkeep);
+17913 +    %let nclus=%left(&nclus);
+17914 +    %let algorithm=%left(&algorithm);
+17915 +    %Let cellwgt=%left(&cellwgt);
+17916 +    data _import_ds;
+17917 +        set &import;
+17918 +    run;
+17919 +
+17920 +
+17921 +    %tmsort(data=&termds(where=(keep='Y')), out=_terms(keep= KEY PARENT),
+17922 +            by=KEY);
+17923 +    %tmsort(data=&_scrout, out=&_scrout, by=_termnum_);
+17924 +
+17925 +    data _svdm1;
+17926 +        merge _terms (where=(PARENT ne _termnum_) in=_b_ keep=KEY PARENT rename=(KEY=_TERMNUM_))
+17927 +              &_scrout (in = _A_ rename=(_COUNT_=COUNT));
+17928 +        by _termnum_;
+17929 +        if _B_;
+17930 +        if (_A_ and _B_ and (PARENT ne .))
+17931 +          then _TERMNUM_ = PARENT;
+17932 +
+17933 +        keep _TERMNUM_ _DOCUMENT_ COUNT;
+17934 +        if (_DOCUMENT_=.) or (COUNT=.) then delete;
+17935 +    run;
+17936 +
+17937 +    proc sql ;
+17938 +       create table _scrout as select distinct _TERMNUM_, _DOCUMENT_,
+17939 +        sum(COUNT) as _COUNT_ from _svdm1
+17940 +        group by _TERMNUM_, _DOCUMENT_;
+17941 +
+17942 +       drop table _svdm1;
+17943 +       drop table _terms;
+17944 +    quit;
+17945 +
+17946 +    %tmsort(data=&termds(where=(KEEP='Y' and PARENT=.)),
+17947 +         out=_weights (rename=(KEY=INDEX WEIGHT=GWGT) keep=KEY WEIGHT),
+17948 +         by=KEY, options=, threads=);
+17949 +
+17950 +
+17951 +    %tmsort(data=_scrout, out=_scrout, by=_DOCUMENT_, options=, threads=);
+17952 +      %let svdkeep=%left(&svdkeep);
+17953 +      data &svd_u;
+17954 +         set &svd_u(keep= index col1-col&svdkeep);
+17955 +      run;
+17956 +
+17957 +      proc sql;
+17958 +         create table  _inweights as
+17959 +         select a.*
+17960 +         from _weights a right join &svd_u b
+17961 +         on a.index=b.index
+17962 +         ;
+17963 +       quit;
+17964 +    %if %lowcase(&cellwgt) = bin %then %let cellwgt=BINARY;
+17965 +    proc spsvd data=_scrout IN_U=&svd_u
+17966 +        local = &cellwgt global = none in_global = _inweights ;
+17967 +        row _TERMNUM_;
+17968 +        col _DOCUMENT_;
+17969 +        entry _COUNT_;
+17970 +        output colpro=_COLPRO bigpro normcol prefix="&prefix._SVD";
+17971 +    run;
+17972 +    proc sort data=_import_ds;
+17973 +    by _DOCUMENT_; run;
+17974 +
+17975 +    proc sort data=_colpro;
+17976 +    by INDEX;
+17977 +    run;
+17978 +
+17979 +    data &export;
+17980 +        merge _import_ds (in=_C_ ) _colpro (rename=(INDEX=_DOCUMENT_));
+17981 +        by _DOCUMENT_;
+17982 +        if _C_;
+17983 +    run;
+17984 +
+17985 +    data &export;
+17986 +       set  &export;
+17987 +       array svd_array &prefix._SVD1 - &prefix._SVD&svdkeep.;
+17988 +       do i = 1 to dim(svd_array);
+17989 +          if svd_array(i)=. then svd_array(i)=0;
+17990 +       end;
+17991 +       drop i;
+17992 +    run;
+17993 +
+17994 +
+17995 +    %tmsort(data=&export, out=, by=_document_, options=, threads=);
+17996 +
+17997 +    %if %left(&algorithm)=1.0 %then %do;
+17998 +
+17999 +        %tmemclus(data=&export,
+18000 +            role=SCORE, clusters=&nclus,
+18001 +            seed=&emoutstat,
+18002 +            outstat=, out=&export,
+18003 +            vars=%STR(&prefix._SVD1 - &prefix._SVD&SVDKEEP),
+18004 +            cov=, iter=5, secclus=,
+18005 +            seciter=, min=, method=, eps=.1, init=, print=,
+18006 +            p=, outliers=, decvar=0,
+18007 +            initstd=, dist=, secstd=, nobs=);
+18008 +        run;
+18009 +
+18010 +        %tmpred(&export, &export, &nclus, type=, ignore=0,
+18011 +                  freqDS=, compress=1);
+18012 +
+18013 +        data &export;
+18014 +           set &export;
+18015 +           rename prob1-prob&nClus = &prefix._prob1-&prefix._prob&nclus;
+18016 +           rename _cluster_=&prefix._cluster_;
+18017 +        run;
+18018 +
+18019 +        %if &outclusters ne %then %do;
+18020 +              %let memloc = _tmmem;
+18021 +              proc tmutil data=&_scrout key=&filterterms ;
+18022 +                 control init memloc="&memloc" release;
+18023 +                 output keeponly out=_outtmutil;
+18024 +              run;
+18025 +
+18026 +              data _docdata;
+18027 +                 set &export (rename=(&prefix._cluster_=cluster));
+18028 +              run;
+18029 +
+18030 +              /* Recalculate desc terms */
+18031 +              data _terms_;
+18032 +               set &filterterms;
+18033 +               by key _ispar;
+18034 +               if first.key then
+18035 +                output;
+18036 +               else;
+18037 +              run;
+18038 +
+18039 +              data _terms_;
+18040 +               set _terms_;
+18041 +               if _ispar='+' then
+18042 +                  Term=_ispar || ' ' || term;
+18043 +              run;
+18044 +
+18045 +             %tmsort(data=_outtmutil,
+18046 +               out=_tmout_,
+18047 +               by=_termnum_,
+18048 +                  options=,
+18049 +               threads=threads);
+18050 +
+18051 +
+18052 +             data _tmout_;
+18053 +               merge _tmout_ (in=_A_)
+18054 +                  _terms_ (rename=(key=_termnum_ term=_term_) keep=key term );
+18055 +               by _termnum_;
+18056 +               if _A_;
+18057 +             run;
+18058 +
+18059 +             data _docs_;
+18060 +               set _docdata (rename=(cluster=_cluster_) keep=_document_ cluster);
+18061 +               _SEGMNT_=_cluster_;
+18062 +             run;
+18063 +
+18064 +             %tmterm1(DSN_TPARS=_tmout_,
+18065 +              DSN_CLUS=_docs_,
+18066 +              DSN_DESC=_desc_,
+18067 +              N_DESC_TERMS=&descterms,
+18068 +              N_CLUS=&nclus,
+18069 +              top_freq=%eval(&descterms*2),
+18070 +              key=);
+18071 +
+18072 +             %tmsort(data=_desc_,
+18073 +               out=_desc_,
+18074 +               by=_cluster_,
+18075 +                  options=,
+18076 +               threads=threads);
+18077 +
+18078 +             proc sql noprint;
+18079 +               create table &outclusters as
+18080 +                 select a.clus_desc, b.* from &outclusters b left join _desc_ a
+18081 +                 on a._cluster_=b._cluster_;
+18082 +             quit;
+18083 +
+18084 +       %end;
+18085 +
+18086 +    %end;
+18087 +    %else %do;
+18088 +
+18089 +        data _clustermean;
+18090 +            set &clusters(keep=_cluster_ _mean1-_mean&svdkeep. freq);
+18091 +        run;
+18092 +
+18093 +        proc sql;
+18094 +        create table _meandocs as
+18095 +            select a.*, b.*
+18096 +            from &export(keep=&prefix._SVD1 - &prefix._SVD&SVDKEEP _document_) a , _clustermean b;
+18097 +        quit;
+18098 +
+18099 +
+18100 +        proc sort data=_meandocs;
+18101 +        by _document_;
+18102 +        run;
+18103 +
+18104 +        %if (&syscc>4) %then %do;
+18105 +            %let emexceptionstring=EMTOOL.INSUFFICIENTMEM;
+18106 +            %goto end_tmc;
+18107 +        %end;
+18108 +
+18109 +        %tmsort(data=_meandocs,out=,by=_document_);
+18110 +
+18111 +          data _docdata(drop=_mean1-_mean&svdkeep. j _CLUSTER_ _freq_ rename=(_cluster_=&prefix._cluster_ distance=&prefix._distance));
+18112 +            set _meandocs;
+18113 +            drop _minDist_ _dist_ j freq;
+18114 +            label CLUSTER = 'Cluster ID';
+18115 +            array _means(&svdkeep) _mean1-_mean&svdkeep.;
+18116 +            array _cols(&svdkeep) &prefix._SVD1-&prefix._SVD&svdkeep.;
+18117 +            by _document_;
+18118 +            retain CLUSTER _mindist_;
+18119 +            _dist_ = 0;
+18120 +            /* innner product*/
+18121 +            do j = 1 to &svdkeep;
+18122 +                _dist_ = _dist_ + (_cols(j)-_means(j))*(_cols(j)-_means(j));
+18123 +            end;
+18124 +
+18125 +            /* initialization*/
+18126 +            if first._document_ then do;
+18127 +                _minDist_ = _dist_;
+18128 +                CLUSTER = _cluster_;
+18129 +            end;
+18130 +            /*optimization*/
+18131 +            if (_dist_ < _minDist_) then do;
+18132 +                _minDist_ = _dist_;
+18133 +                CLUSTER = _cluster_;
+18134 +            end;
+18135 +            if last._document_ then do;
+18136 +               output;
+18137 +            end;
+18138 +        run;
+18139 +        proc sort data=_docdata;
+18140 +           by _document_;
+18141 +        proc sort data=&export;
+18142 +           by _document_;
+18143 +        run;
+18144 +
+18145 +        data &export;
+18146 +           merge &export _docdata;
+18147 +           by _document_;
+18148 +           rename cluster=&prefix._cluster_;
+18149 +        run;
+18150 +    %end;
+18151 +
+18152 +    /* Reorder variables in exported data set */
+18153 +    proc sql noprint;
+18154 +        create table &export as
+18155 +        select &textvar, &prefix._cluster_, *
+18156 +        from &export;
+18157 +    quit;
+18158 +
+18159 +
+18160 +    %if &outclusters ne %then %do;
+18161 +
+18162 +        /* update freqencies in cluster table */
+18163 +         proc freq data =_docdata ;
+18164 +            tables cluster/out=_tempfreqtable;
+18165 +         run;
+18166 +
+18167 +        proc sql noprint;
+18168 +            create table &outclusters as
+18169 +            select  a.*, b.count as freq, b.percent/100 as percent
+18170 +            from &clusters (drop= freq percent _rmsstd_) a, _tempfreqtable b
+18171 +           where a._cluster_=b.cluster;
+18172 +
+18173 +        quit;
+18174 +
+18175 +        %if %left(&algorithm)=2.0 %then %do;
+18176 +
+18177 +          proc sql noprint;
+18178 +
+18179 +             create table &hierds as select a.freq, b.*
+18180 +                from &outclusters a right join &hierds b on a._cluster_=b._cluster_;
+18181 +          quit;
+18182 +
+18183 +          /* Find descriptive terms for clusters & parents */
+18184 +          filename temp catalog 'sashelp.emtxtext.tmgethierterms.source';
+18185 +          %include temp;
+18186 +          filename temp;
+18187 +
+18188 +          %tm_getHierTerms(hierds=&hierds,
+18189 +                         docs=_docdata,
+18190 +                         tmout=&filtertmout,
+18191 +                         terms= &filterterms,
+18192 +                         ndescterms=&descterms);
+18193 +
+18194 +          proc sql noprint;
+18195 +             create table &outclusters as
+18196 +                select a.clus_desc, b.* from &hierds a, &outclusters b
+18197 +                where a._cluster_=b._cluster_;
+18198 +
+18199 +             update &hierds set freq=0 where clus_desc="" and _cluster_ ne 1;
+18200 +          quit;
+18201 +
+18202 +          /* Add frequencies to ancestors */
+18203 +          data _hd;
+18204 +             set &hierds;
+18205 +             cluster=_cluster_;
+18206 +             drop _cluster_ parent;
+18207 +          run;
+18208 +
+18209 +          %let empty=1;
+18210 +
+18211 +          %do %while (&empty);
+18212 +
+18213 +            proc sql noprint;
+18214 +                update _hd set freq=
+18215 +                    (select sum(freq) from &HIERDS
+18216 +                    where parent=cluster)
+18217 +                    where freq=. and cluster not in
+18218 +                    (select parent from &hierds where freq=.);
+18219 +                select count(*) into :empty from _hd
+18220 +                    where freq=.;
+18221 +                update &hierds set freq=(select freq from _hd where _cluster_=cluster);
+18222 +            quit;
+18223 +
+18224 +          %end;
+18225 +
+18226 +          /* Set graphdesc variable for graph display */
+18227 +          data &hierds(drop=plus pos sub);
+18228 +            set &hierds;
+18229 +            plus='';
+18230 +            if substr(CLUS_DESC, 1, 1) = "+" then plus="+ ";
+18231 +            if ktrim(clus_desc) ne "" then do;
+18232 +              if(substr(CLUS_DESC, 1, 1)) = "'" then do;
+18233 +                 pos = findc(CLUS_DESC, "'",2);
+18234 +                 sub = substr(CLUS_DESC,1,pos);
+18235 +              end;
+18236 +              else sub = scan(CLUS_DESC, 1);
+18237 +              graphdesc=_CLUSTER_ || ': ' || plus || sub;
+18238 +            end;
+18239 +            else graphdesc=_CLUSTER_;
+18240 +          run;
+18241 +        %end;
+18242 +
+18243 +         /*calculate residual for each doc */
+18244 +
+18245 +         proc sort data=_docdata (rename=(cluster=_cluster_));
+18246 +            by _cluster_;
+18247 +         run;
+18248 +
+18249 +         data _rmscalc;
+18250 +            merge _docdata(in=inhere) &outclusters;
+18251 +            array _means(&svdkeep) _mean1-_mean&svdkeep.;
+18252 +            array _svds(&svdkeep) &prefixstring._SVD1 - &prefixstring._SVD&svdkeep.;
+18253 +            by _cluster_;
+18254 +            error=0;
+18255 +            do i = 1 to &svdkeep;
+18256 +               error +( (_svds{i}-_means{i}) * (_svds{i}-_means{i}));
+18257 +            end;
+18258 +
+18259 +            drop i ;
+18260 +         run;
+18261 +
+18262 +          /*calc standardized residual for clusters*/
+18263 +         proc summary data=_rmscalc nway;
+18264 +            class _cluster_;
+18265 +            var error;
+18266 +            output out=_meanerr mean=meane sum=sume;
+18267 +         run;
+18268 +
+18269 +         data _rmsse;
+18270 +            set _meanerr;
+18271 +            /* original code divides by number of svd dims*/
+18272 +            if _freq_ gt 1 then do;
+18273 +              _rmsstd_=sqrt(sume/((_freq_-1)*(&svdkeep.)));
+18274 +            end;
+18275 +            else do;
+18276 +              _rmsstd_=0;
+18277 +            end;
+18278 +            keep _cluster_  _rmsstd_;
+18279 +         run;
+18280 +
+18281 +
+18282 +         proc sql noprint;
+18283 +           create table _clusstat2 as
+18284 +           select a.*,b.*
+18285 +           from &outclusters a left join _rmsse b
+18286 +           on a._cluster_=b._cluster_;
+18287 +
+18288 +           create table &outclusters as
+18289 +           select * from _clusstat2;
+18290 +         quit;
+18291 +
+18292 +
+18293 +    %end;
+18294 +
+18295 +
+18296 +%end_tmc:
+18297 +    %if &tm_debug =0  %then %do;
+18298 +    proc sql noprint;
+18299 +        drop table _weights;
+18300 +        drop table _colpro;
+18301 +        drop table _scrout;
+18302 +        drop table _svdm1;
+18303 +        drop table _inweights;
+18304 +        drop table _clustermean;
+18305 +        drop table _clusstat2;
+18306 +        drop table _outtmutil;
+18307 +        drop table _rmscalc;
+18308 +        drop table _rmsse;
+18309 +        drop table _meanerr;
+18310 +        drop table _meandocs;
+18311 +        drop table _import_ds;
+18312 +        drop table _hd;
+18313 +        drop table _terms_;
+18314 +        drop table _docs_;
+18315 +        drop table _tmout_;
+18316 +        drop table _desc_;
+18317 +        drop table _docdata;
+18318 +    quit;
+18319 +    %end;
+18320 +
+18321 +%mend tmc_doc_score;
+18322 +
+18323 +
+18324 +
+18325 +
+18326 +
+18327 +
+18328 +
+18329 +
+18330 +
+18331 +
+18332 +
+18333 +
+18334 +
+18335 +
+18336 +
+18337 +
+18338 +
+18339 +
+18340 +
+18341 +
+18342 +
+NOTE: %INCLUDE (level 1) ending.
+NOTE: %INCLUDE (level 1) file TEMP is file SASHELP.EMTEXT.TMSVD.SOURCE.
+18344 + /*
+18346 +  Macro:     tmsvd.sas
+18347 +  Purpose:  Call proc spsvd with given defaults and parameters.
+18348 +  Syntax:   %tmsvd(in,k=,global=,local=,row=,col=,entry=,scaleOp=,normOp=,
+18349 +            in_global=,in_u=,in_s=,in_v=,u=,s=,v=,wgt=,wordPro=,
+18350 +           colPro=, p=, tol=, gwgt=, mink=, maxk=, res=, remote=, compact=,bigpro=0);
+18352 +  Required Parameters:  in     The data= data set.
+18353 +  Optional Parameters:  k= The number of dimensions to reduce to
+18354 +                   global=  The global weight to use, defaults to IDF.
+18355 +                   local=  The local weight to use, defaults to BINARY.
+18356 +                   row=   Column in the input data set that represents
+18357 +                          the matrix row,
+18358 +                       defaults to _termnum_.
+18359 +            col=   Column in the input data set that represents
+18360 +                          the matrix column,
+18361 +                         defaults to _document_.
+18362 +            entry= Column in the input data set that represents the
+18363 +                          value in the
+18364 +                         given row,column cell.  Defaults to _count_.
+18365 +             scaleOp= Scale options: scalerow scalecol scaleall
+18366 +            normOp=  Normalization options: normrow normcol normall
+18367 +            in_global= The gwgt= output data set from a prior spsvd run.
+18368 +                   in_u=  The u= output from a prior spsvd run.
+18369 +                   in_s=  The s= output from a prior spsvd run.
+18370 +                   in_v=  The v= output from a prior spsvd run.
+18371 +                   u=     matrix U data set
+18372 +                   s=     matrix S data set
+18373 +                   v=     matrix V data set
+18374 +                  wgt=   weighted input matrix data set
+18375 +                  wordPro= projections of rows of A onto columns of V
+18376 +                  colPro=  projection of columns of A onto columns of U
+18377 +                  p=   number of iterations
+18378 +                  tol= convergence tolerance
+18379 +                   gwgt= global weights data set
+18380 +                  mink=
+18381 +                  maxk=
+18382 +                  res=
+18383 +                  remote= name of file
+18385 +  History:
+18386 +  2001/01/16 - Kevin Daly - Initial coding.
+18387 +  2001/01/19 - Kevin Daly - Fixed so that when global=NONE and local=NONE,
+18388 +             no gwgt data set
+18389 +               is requested.  This was causing an error and the proc
+18390 +              would terminate.
+18391 +  2001/02/21 - Bill Wheeler - Allowd all options to be specified
+18392 +  2001/05/14 - Bill Wheeler - Added version 9 options min_k, max_k, resolution
+18393 +  2001/08/14 - Bill Wheeler - Added remote option
+18394 +  2001/11/29 - Bill Wheeler - Updated for version 8 or 9
+18395 +*/
+18397 +%macro tmsvd(in,k=,global=,local=,row=,col=,entry=,scaleOp=,normOp=,
+18398 +             in_global=, in_u=, in_s=, in_v=, u=, s=, v=,
+18399 +             wgt=, wordPro=, colPro=, p=, tol=, gwgt=, mink=, maxk=, res=,
+18400 +             remote=, compact=,bigpro= );
+18402 +  %put;
+18403 +  /* Defaults */
+18404 +  %if &k ^= %then %let k = k = &k;
+18405 +  %if &global ^= %then %let global = global = &global;
+18406 +  %if %lowcase(&local) = bin %then %let local=BINARY;
+18407 +  %if &local ^= %then %let local=local=&local;
+18408 +  %if &row= %then %let row=_termnum_;
+18409 +  %if &col= %then %let col=_document_;
+18410 +  %if &entry= %then %let entry=_count_;
+18411 +  %if &scaleOp ^= %then %let scaleOp = scaledoc;
+18412 +  %if &normOp ^= %then %let normOp = normdoc;
+18413 +  %if &compact ^= %then %let compact = compact;
+18414 +  %else %let compact = ;
+18416 +  %if &in_global ^= %then %let in_global = in_global=&in_global;
+18417 +  %if &in_u ^= %then %let in_u = in_u=&in_u;
+18418 +  %if &in_s ^= %then %let in_s = in_s=&in_s;
+18419 +  %if &in_v ^= %then %let in_v = in_v=&in_v;
+18420 +  %if ((&p ^= ) and (&p ^= .)) %then %let p = p=&p;
+18421 +  %else %let p = ;
+18422 +  %if ((&tol ^= ) and (&tol ^= .)) %then %let tol = tol=&tol;
+18423 +  %else %let tol = ;
+18425 +  %IF &SYSVER < 9 %THEN %DO;
+18426 +    %IF &k = %THEN %DO;
+18427 +      %IF &maxk ^= %THEN %LET k = k = &maxk;
+18428 +      %ELSE %LET k = k = 100;
+18429 +    %END;
+18430 +    %LET mink = ;
+18431 +    %LET maxk = ;
+18432 +    %LET res = ;
+18433 +    %LET remote = ;
+18434 +    %LET compact = ;
+18435 +  %END;
+18438 +  %if &colPro ^= %then %let colPro = COLPRO=&colPro;
+18439 +  %if &gwgt ^= %then %let gwgt = GWGT=&gwgt;
+18440 +  %if &s ^= %then %let s = S=&s;
+18441 +  %if &u ^= %then %let u = U=&u;
+18442 +  %if &v ^= %then %let v = V=&v;
+18443 +  %if &wordPro ^= %then %let wordPro = WORDPRO=&wordPro;
+18444 +  %if &wgt ^= %then %let wgt = WGT=&wgt;
+18445 +  %if (&mink ^=  ) and (&mink ^= .) %then %let mink = min_k = &mink;
+18446 +  %else %let mink = ;
+18447 +  %if &maxk ^= %then %let maxk = max_k = &maxk;
+18448 +  %if &res ^= %then %let res = res = &res;
+18449 +  proc sort data=&in; by &col;
+18450 +  /* Run the proc */
+18451 +  proc spsvd data=&in
+18452 +      &mink
+18453 +      &maxk
+18454 +      &res
+18455 +      &k &compact
+18456 +    &local &global &in_global
+18457 +    &in_u &in_s &in_v &p &tol;
+18458 +    row &row; col &col; entry &entry;
+18459 +      output &colPro &gwgt &normOp &scaleOp &s &u &v
+18460 +           &wordPro &wgt &bigpro;
+18461 +    &remote;
+18462 +  run;
+18464 +%mend tmsvd;
+NOTE: %INCLUDE (level 1) ending.
+NOTE: %INCLUDE (level 1) file TEMP is file SASHELP.EMTEXT.TMFAST.SOURCE.
+18465 + /*
+18466 +
+18467 +  Macro:   tmfast.sas
+18468 +  Purpose: Call proc fastclus with given defaults and parameters.
+18469 +  Syntax:  %tmfast(data=, clusters=, outstat=, vars=);
+18470 +
+18471 +  Required Parameters:  data=      The input data set.
+18472 +                        clusters=  The maximum number of clusters
+18473 +
+18474 +  Optional Parameters:  vars=      Variables to be used
+18475 +                        outstat=   The name of the OUTSTAT data set
+18476 +                        outseed=   The name of the OUTSEED data set
+18477 +
+18478 +  Either outstat or outseed mut be given, but not both.
+18479 +  History:
+18480 +  2001/01/16 - Bill Wheeler - Initial Coding.
+18481 +
+18482 +*/
+18483 +%MACRO tmfast(data=, clusters=, outstat=, outseed=,
+18484 +                 id=, out=, vars=);
+18485 + /* defaults */
+18486 + %if (&id ne ) %then %let id = id &id;
+18487 + %if (&out ne ) %then %let out = out = &out;
+18488 + %if (&vars ne ) %then %let var = var &vars;
+18489 + %else %let var = ;
+18490 +
+18491 + %if &outseed= %then
+18492 + %do;
+18493 +   proc fastclus data = &data
+18494 +   maxclusters = &clusters noprint
+18495 +   outstat = &outstat &out;
+18496 +   &var;
+18497 +   &id;
+18498 + %end;
+18499 + %else
+18500 + %do;
+18501 +   proc fastclus data = &data
+18502 +   maxclusters = &clusters noprint
+18503 +   outseed = &outseed &out;
+18504 +   &var;
+18505 +   &id;
+18506 + %end;
+18507 +%MEND tmfast;
+NOTE: %INCLUDE (level 1) ending.
+NOTE: Table WORK._CLUSTERMS created, with 2872 rows and 9 columns.
+ 
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 18529 observations read from the data set EMWS1.TEXTFILTER_TMOUT.
+NOTE: The data set WORK._FILTER_TMOUT has 18529 observations and 3 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+ 
+ 
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+ 
+ 
+ 
+NOTE: There were 3849 observations read from the data set EMWS1.TEXTPARSING_TRAIN.
+NOTE: There were 3849 observations read from the data set EMWS1.TEXTFILTER_DOC_IDS.
+NOTE: There were 3849 observations read from the data set EMWS1.TEXTFILTER_TRAIN.
+NOTE: The data set WORK._IMPORT_DS has 3849 observations and 8 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.05 seconds
+      cpu time            0.04 seconds
+ 
+ 
+ 
+NOTE: Input data set is already sorted; it has been copied to the output data set.
+NOTE: There were 2872 observations read from the data set WORK._CLUSTERMS.
+      WHERE keep='Y';
+NOTE: The data set WORK._TERMS has 2872 observations and 2 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 18529 observations read from the data set WORK._FILTER_TMOUT.
+NOTE: The data set WORK._FILTER_TMOUT has 18529 observations and 3 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.03 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 2357 observations read from the data set WORK._TERMS.
+      WHERE PARENT not = _termnum_;
+NOTE: There were 18529 observations read from the data set WORK._FILTER_TMOUT.
+NOTE: The data set WORK._SVDM1 has 18529 observations and 3 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.01 seconds
+ 
+ 
+NOTE: Table WORK._SCROUT created, with 18501 rows and 3 columns.
+ 
+NOTE: Table WORK._SVDM1 has been dropped.
+NOTE: Table WORK._TERMS has been dropped.
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.03 seconds
+      cpu time            0.03 seconds
+ 
+ 
+ 
+NOTE: Input data set is already sorted; it has been copied to the output data set.
+NOTE: There were 1571 observations read from the data set WORK._CLUSTERMS.
+      WHERE (KEEP='Y') and (PARENT=.);
+NOTE: The data set WORK._WEIGHTS has 1571 observations and 2 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 18501 observations read from the data set WORK._SCROUT.
+NOTE: The data set WORK._SCROUT has 18501 observations and 3 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 1571 observations read from the data set EMWS1.TEXTCLUSTER_SVD_U.
+NOTE: The data set EMWS1.TEXTCLUSTER_SVD_U has 1571 observations and 12 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.04 seconds
+      cpu time            0.04 seconds
+ 
+ 
+NOTE: Table WORK._INWEIGHTS created, with 1571 rows and 2 columns.
+ 
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.03 seconds
+      cpu time            0.00 seconds
+ 
+ 
+ 
+NOTE: There were 18501 observations read from the data set WORK._SCROUT.
+NOTE: There were 1571 observations read from the data set EMWS1.TEXTCLUSTER_SVD_U.
+NOTE: There were 1571 observations read from the data set WORK._INWEIGHTS.
+NOTE: The data set WORK._COLPRO has 3701 observations and 12 variables.
+NOTE: PROCEDURE SPSVD used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 3849 observations read from the data set WORK._IMPORT_DS.
+NOTE: The data set WORK._IMPORT_DS has 3849 observations and 8 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 3701 observations read from the data set WORK._COLPRO.
+NOTE: The data set WORK._COLPRO has 3701 observations and 12 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+ 
+ 
+ 
+NOTE: There were 3849 observations read from the data set WORK._IMPORT_DS.
+NOTE: There were 3701 observations read from the data set WORK._COLPRO.
+NOTE: The data set EMWS1.TEXTCLUSTER_TRAIN has 3849 observations and 19 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.05 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 3849 observations read from the data set EMWS1.TEXTCLUSTER_TRAIN.
+NOTE: The data set EMWS1.TEXTCLUSTER_TRAIN has 3849 observations and 19 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.13 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 3849 observations read from the data set EMWS1.TEXTCLUSTER_TRAIN.
+NOTE: The data set EMWS1.TEXTCLUSTER_TRAIN has 3849 observations and 19 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.12 seconds
+      cpu time            0.03 seconds
+ 
+ 
+ 
+NOTE: There were 3849 observations read from the data set EMWS1.TEXTCLUSTER_TRAIN.
+NOTE: There were 21 observations read from the data set EMWS1.TEXTCLUSTER_EMOUTSTAT.
+NOTE: The data set EMWS1.TEXTCLUSTER_TRAIN has 3849 observations and 30 variables.
+NOTE: PROCEDURE EMCLUS used (Total process time):
+      real time           0.12 seconds
+      cpu time            0.04 seconds
+ 
+ 
+ 
+NOTE: There were 3849 observations read from the data set EMWS1.TEXTCLUSTER_TRAIN.
+NOTE: The data set EMWS1.TEXTCLUSTER_TRAIN has 3849 observations and 30 variables.
+NOTE: Compressing data set EMWS1.TEXTCLUSTER_TRAIN decreased size by 36.67 percent.
+      Compressed is 19 pages; un-compressed would require 30 pages.
+NOTE: DATA statement used (Total process time):
+      real time           0.10 seconds
+      cpu time            0.06 seconds
+ 
+ 
+ 
+NOTE: There were 3849 observations read from the data set EMWS1.TEXTCLUSTER_TRAIN.
+NOTE: The data set EMWS1.TEXTCLUSTER_TRAIN has 3849 observations and 30 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.10 seconds
+      cpu time            0.03 seconds
+ 
+ 
+ 
+NOTE: There were 18529 observations read from the data set WORK._FILTER_TMOUT.
+NOTE: There were 2872 observations read from the data set EMWS1.TEXTFILTER_TERMS_DATA.
+      WHERE KEEP='Y';
+NOTE: There were 10098 observations read from the data set EMWS1.TEXTFILTER_TERM_STRINGS.
+NOTE: The data set WORK._OUTTMUTIL has 18501 observations and 3 variables.
+NOTE: PROCEDURE TMUTIL used (Total process time):
+      real time           0.09 seconds
+      cpu time            0.04 seconds
+ 
+ 
+ 
+NOTE: There were 3849 observations read from the data set EMWS1.TEXTCLUSTER_TRAIN.
+NOTE: The data set WORK._DOCDATA has 3849 observations and 30 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.05 seconds
+      cpu time            0.00 seconds
+ 
+ 
+ 
+NOTE: There were 2872 observations read from the data set EMWS1.TEXTFILTER_TERMS_DATA.
+      WHERE KEEP='Y';
+NOTE: There were 10098 observations read from the data set EMWS1.TEXTFILTER_TERM_STRINGS.
+NOTE: There were 2872 observations read from the data set EMWS1.TEXTFILTER_TERMS.
+NOTE: The data set WORK._TERMS_ has 2357 observations and 13 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.06 seconds
+      cpu time            0.04 seconds
+ 
+ 
+ 
+NOTE: There were 2357 observations read from the data set WORK._TERMS_.
+NOTE: The data set WORK._TERMS_ has 2357 observations and 13 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 18501 observations read from the data set WORK._OUTTMUTIL.
+NOTE: The data set WORK._TMOUT_ has 18501 observations and 3 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.03 seconds
+ 
+ 
+ 
+NOTE: There were 18501 observations read from the data set WORK._TMOUT_.
+NOTE: There were 2357 observations read from the data set WORK._TERMS_.
+NOTE: The data set WORK._TMOUT_ has 18501 observations and 4 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 3849 observations read from the data set WORK._DOCDATA.
+NOTE: The data set WORK._DOCS_ has 3849 observations and 3 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+ 
+ 
+NOTE: SQL view WORK._CMB has been defined.
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+ 
+ 
+ 
+NOTE: There were 18501 observations read from the data set WORK._TMOUT_.
+NOTE: There were 3849 observations read from the data set WORK._DOCS_.
+NOTE: There were 18501 observations read from the data set WORK._CMB.
+NOTE: The data set WORK._TFREQ has 5808 observations and 5 variables.
+NOTE: PROCEDURE SUMMARY used (Total process time):
+      real time           0.04 seconds
+      cpu time            0.04 seconds
+ 
+ 
+ 
+NOTE: There were 18501 observations read from the data set WORK._TMOUT_.
+NOTE: There were 3849 observations read from the data set WORK._DOCS_.
+NOTE: There were 18501 observations read from the data set WORK._CMB.
+NOTE: The data set WORK._SUM has 11 observations and 4 variables.
+NOTE: PROCEDURE SUMMARY used (Total process time):
+      real time           0.04 seconds
+      cpu time            0.04 seconds
+ 
+ 
+ 
+NOTE: There were 11 observations read from the data set WORK._SUM.
+NOTE: DATA statement used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.01 seconds
+ 
+ 
+NOTE: Table WORK._SUM has been dropped.
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+ 
+ 
+ 
+NOTE: There were 5808 observations read from the data set WORK._TFREQ.
+NOTE: The data set WORK._TFREQ has 5808 observations and 5 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 5808 observations read from the data set WORK._TFREQ.
+NOTE: The data set WORK._UNQT has 240 observations and 3 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+ 
+ 
+ 
+NOTE: There were 240 observations read from the data set WORK._UNQT.
+NOTE: 63 observations with duplicate key values were deleted.
+NOTE: The data set WORK._UNQT has 177 observations and 1 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.01 seconds
+ 
+ 
+NOTE: Table WORK._CLCDF created, with 994 rows and 3 columns.
+ 
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.03 seconds
+ 
+ 
+NOTE: Table WORK._UNQT has been dropped.
+NOTE: Table WORK._TFREQ has been dropped.
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+ 
+ 
+ 
+NOTE: There were 994 observations read from the data set WORK._CLCDF.
+NOTE: The data set WORK._CLCDF has 177 observations and 12 variables.
+NOTE: PROCEDURE TRANSPOSE used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.00 seconds
+ 
+ 
+ 
+NOTE: There were 177 observations read from the data set WORK._CLCDF.
+NOTE: The data set WORK._CLCDF has 177 observations and 22 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 177 observations read from the data set WORK._CLCDF.
+NOTE: The data set WORK._CLCDFTR has 994 observations and 4 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.03 seconds
+ 
+ 
+NOTE: Table WORK._CLCDF has been dropped.
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+ 
+ 
+ 
+NOTE: There were 994 observations read from the data set WORK._CLCDFTR.
+NOTE: The data set WORK._CLCDFTR has 994 observations and 4 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 994 observations read from the data set WORK._CLCDFTR.
+NOTE: The data set WORK._DESC_ has 10 observations and 2 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+ 
+ 
+NOTE: Table WORK._CLCDFTR has been dropped.
+NOTE: View WORK._CMB has been dropped.
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+ 
+ 
+ 
+NOTE: There were 10 observations read from the data set WORK._DESC_.
+NOTE: The data set WORK._DESC_ has 10 observations and 2 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+ 
+ 
+WARNING: This CREATE TABLE statement recursively references the target table. A consequence of this is a possible data integrity problem.
+WARNING: Variable clus_desc already exists on file EMWS1.TEXTCLUSTER_CLUSTERS.
+NOTE: Table EMWS1.TEXTCLUSTER_CLUSTERS created, with 10 rows and 16 columns.
+ 
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.21 seconds
+      cpu time            0.03 seconds
+ 
+ 
+WARNING: This CREATE TABLE statement recursively references the target table. A consequence of this is a possible data integrity problem.
+WARNING: Variable Message already exists on file EMWS1.TEXTCLUSTER_TRAIN.
+WARNING: Variable TextCluster_cluster_ already exists on file EMWS1.TEXTCLUSTER_TRAIN.
+NOTE: Table EMWS1.TEXTCLUSTER_TRAIN created, with 3849 rows and 30 columns.
+ 
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.09 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 3849 observations read from the data set WORK._DOCDATA.
+NOTE: The data set WORK._TEMPFREQTABLE has 10 observations and 3 variables.
+NOTE: The PROCEDURE FREQ printed page 2.
+NOTE: PROCEDURE FREQ used (Total process time):
+      real time           0.03 seconds
+      cpu time            0.04 seconds
+ 
+ 
+WARNING: This CREATE TABLE statement recursively references the target table. A consequence of this is a possible data integrity problem.
+NOTE: Table EMWS1.TEXTCLUSTER_CLUSTERS created, with 10 rows and 15 columns.
+ 
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.09 seconds
+      cpu time            0.04 seconds
+ 
+ 
+ 
+NOTE: There were 3849 observations read from the data set WORK._DOCDATA.
+NOTE: The data set WORK._DOCDATA has 3849 observations and 30 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+ 
+ 
+ 
+NOTE: There were 3849 observations read from the data set WORK._DOCDATA.
+NOTE: There were 10 observations read from the data set EMWS1.TEXTCLUSTER_CLUSTERS.
+NOTE: The data set WORK._RMSCALC has 3849 observations and 45 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.04 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 3849 observations read from the data set WORK._RMSCALC.
+NOTE: The data set WORK._MEANERR has 10 observations and 5 variables.
+NOTE: PROCEDURE SUMMARY used (Total process time):
+      real time           0.03 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 10 observations read from the data set WORK._MEANERR.
+NOTE: The data set WORK._RMSSE has 10 observations and 2 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+ 
+ 
+WARNING: Variable _cluster_ already exists on file WORK._CLUSSTAT2.
+NOTE: Table WORK._CLUSSTAT2 created, with 10 rows and 16 columns.
+ 
+NOTE: Table EMWS1.TEXTCLUSTER_CLUSTERS created, with 10 rows and 16 columns.
+ 
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.08 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: DATA statement used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+ 
+ 
+ 
+NOTE: The file PRE is:
+      Filename=P:\Final Project\Twitter_Content_Engineering\Workspaces\EMWS1\TextCluster\PRESCORECODE.sas,
+      RECFM=V,LRECL=32767,File Size (bytes)=0,
+      Last Modified=23Apr2020:10:28:04,
+      Create Time=23Apr2020:10:28:04
+ 
+NOTE: 13 records were written to the file PRE.
+      The minimum record length was 14.
+      The maximum record length was 62.
+NOTE: DATA statement used (Total process time):
+      real time           0.03 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: The file PRE is:
+      Filename=P:\Final Project\Twitter_Content_Engineering\Workspaces\EMWS1\TextCluster\PRESCORECODE.sas,
+      RECFM=V,LRECL=20000,File Size (bytes)=452,
+      Last Modified=23Apr2020:10:28:04,
+      Create Time=23Apr2020:10:28:04
+ 
+NOTE: 23 records were written to the file PRE.
+      The minimum record length was 1.
+      The maximum record length was 80.
+NOTE: DATA statement used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.01 seconds
+ 
+ 
+NOTE: Fileref TMPRE has been deassigned.
+ 
+NOTE: There were 10 observations read from the data set EMWS1.TEXTCLUSTER_CLUSTERS.
+NOTE: The data set WORK._CODECLUSTERS has 10 observations and 15 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.10 seconds
+      cpu time            0.01 seconds
+ 
+ 
+NOTE: Libref TERMLOC refers to the same physical library as EMWS1.
+NOTE: Libref TERMLOC was successfully assigned as follows:
+      Engine:        V9
+      Physical Name: P:\Final Project\Twitter_Content_Engineering\Workspaces\EMWS1
+ 
+NOTE: The file _TMSCORE is:
+      Filename=P:\Final Project\Twitter_Content_Engineering\Workspaces\EMWS1\TextCluster\EMPUBLISHSCORE.sas,
+      RECFM=V,LRECL=32767,File Size (bytes)=0,
+      Last Modified=23Apr2020:10:28:04,
+      Create Time=23Apr2020:10:28:04
+ 
+NOTE: 5 records were written to the file _TMSCORE.
+      The minimum record length was 43.
+      The maximum record length was 115.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+ 
+ 
+NOTE: Fileref _TMSCORE has been deassigned.
+NOTE: Fileref TEMP has been deassigned.
+18508  *------------------------------------------------------------*;
+18509  * End SCORE: TextCluster;
+18510  *------------------------------------------------------------*;
+ 
+18512  *------------------------------------------------------------*;
+18513  * TextCluster: Computing metadata for TRAIN data;
+18514  *------------------------------------------------------------*;
+ 
+18959  proc sort data = EMWS1.TextFilter_EMINFO OUT=WORK.SORTEDEMINFO NOTHREADS;
+18960  by TARGET KEY;
+18961  run;
+ 
+NOTE: There were 5 observations read from the data set EMWS1.TEXTFILTER_EMINFO.
+NOTE: The data set WORK.SORTEDEMINFO has 5 observations and 3 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+ 
+ 
+18962  proc sort data = EMWS1.TextCluster_EMINFO OUT=WORK.TEMP_INFO NOTHREADS;
+18963  by TARGET KEY;
+18964  run;
+ 
+NOTE: There were 4 observations read from the data set EMWS1.TEXTCLUSTER_EMINFO.
+NOTE: The data set WORK.TEMP_INFO has 4 observations and 3 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.00 seconds
+ 
+ 
+18965  data EMWS1.TextCluster_EMINFO;
+18966  merge WORK.SORTEDEMINFO WORK.TEMP_INFO;
+18967  by TARGET KEY;
+18968  run;
+ 
+NOTE: There were 5 observations read from the data set WORK.SORTEDEMINFO.
+NOTE: There were 4 observations read from the data set WORK.TEMP_INFO.
+NOTE: The data set EMWS1.TEXTCLUSTER_EMINFO has 6 observations and 3 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.04 seconds
+      cpu time            0.04 seconds
+ 
+ 
+18969  proc datasets lib=work nolist;
+18970  delete TEMP_INFO SORTEDEMINFO;
+18971  run;
+ 
+NOTE: Deleting WORK.TEMP_INFO (memtype=DATA).
+NOTE: Deleting WORK.SORTEDEMINFO (memtype=DATA).
+18972  quit;
+ 
+NOTE: PROCEDURE DATASETS used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+ 
+ 
+*------------------------------------------------------------*
+* Report Log
+Date:                April 23, 2020
+Time:                10:28:06
+*------------------------------------------------------------*
+18996  %let EMEXCEPTIONSTRING=;
+18997  *------------------------------------------------------------*;
+18998  * REPORT: TextCluster;
+18999  *------------------------------------------------------------*;
+19000  %let EM_ACTION = REPORT;
+19001  %let syscc = 0;
+19002  %macro main();
+19003
+19004     %if %upcase(&EM_ACTION) eq CREATE %then %do;
+19005        filename temp catalog 'sashelp.emtxtext.cluster_create.source';
+19006        %include temp;
+19007        %create();
+19008     %end;
+19009     %if %upcase(&EM_ACTION) eq TRAIN %then %do;
+19010        filename temp catalog 'sashelp.emtxtext.cluster_train.source';
+19011        %include temp;
+19012        %train();
+19013     %end;
+19014     %if %upcase(&EM_ACTION) eq REPORT %then %do;
+19015        filename temp catalog 'sashelp.emtxtext.cluster_report.source';
+19016        %include temp;
+19017        %report();
+19018     %end;
+19019     %if %upcase(&EM_ACTION) eq SCORE %then %do;
+19020        filename temp catalog 'sashelp.emtxtext.cluster_score.source';
+19021        %include temp;
+19022        %score();
+19023     %end;
+19024  %mend main;
+19025
+19026  %main();
+NOTE: %INCLUDE (level 1) file TEMP is file SASHELP.EMTXTEXT.CLUSTER_REPORT.SOURCE.
+19027 +%macro report();
+19028 +
+19029 +    %EM_GETNAME(KEY=GRAPH_TABLE, TYPE=DATA);
+19030 +    %EM_GETNAME(KEY=clusters, TYPE=DATA);
+19031 +    %EM_GETNAME(KEY=prescorecode, type=file, extension=sas);
+19032 +    %em_getname(key=svd_s, type=data);
+19033 +    %em_getname(key=hierds, type=data);
+19034 +
+19035 +    proc sql noprint;
+19036 +        select count(*) into :svdkeep
+19037 +            from &em_user_svd_s
+19038 +            where keep=1;
+19039 +        select count(*) into :nclus
+19040 +            from &em_user_clusters;
+19041 +    quit;
+19042 +    %let svdkeep=%left(&svdkeep);
+19043 +    %let nclus=%left(&nclus);
+19044 +    %let clusterid=%sysfunc(sasmsg(sashelp.tmine, rpt_text_clusterid_vlabel, NOQUOTE));
+19045 +    %let frequency=%sysfunc(sasmsg(sashelp.tmine, rpt_text_frequency_vlabel, NOQUOTE));
+19046 +    %let percentage=%sysfunc(sasmsg(sashelp.tmine, rpt_text_percentage_vlabel, NOQUOTE));
+19047 +    %let descterms=%sysfunc(sasmsg(sashelp.tmine, rpt_text_descterms_vlabel, NOQUOTE));
+19048 +    %let rmsstd=%sysfunc(sasmsg(sashelp.tmine, rpt_text_rmsstd_vlabel, NOQUOTE));
+19049 +    %let coordinate=%sysfunc(sasmsg(sashelp.tmine, rpt_text_coordinate_vlabel, NOQUOTE));
+19050 +    %let parent=%sysfunc(sasmsg(sashelp.tmine, rpt_text_parent_vlabel, NOQUOTE));
+19051 +    %let hierlevel=%sysfunc(sasmsg(sashelp.tmine, rpt_text_hierlevel_vlabel, NOQUOTE));
+19052 +    %let graphdesc=%sysfunc(sasmsg(sashelp.tmine, rpt_text_graphdesc_vlabel, NOQUOTE));
+19053 +    %let descshort=%sysfunc(sasmsg(sashelp.tmine, rpt_text_descshort_vlabel, NOQUOTE));
+19054 +
+19055 +    data &em_user_graph_table;
+19056 +        set &em_user_clusters;
+19057 +        label _cluster_="&clusterid"
+19058 +              clus_desc="&DescTerms"
+19059 +              freq="&Frequency"
+19060 +              percent="&Percentage"
+19061 +              _rmsstd_="&rmsstd"
+19062 +              %do i=1 %to &svdkeep;
+19063 +                _mean&i="&Coordinate &i"
+19064 +              %end;
+19065 +              ;
+19066 +        format percent percent10.;
+19067 +        desc_short = clus_desc;
+19068 +        if COUNTW(clus_desc, ' ') > 5 then do;
+19069 +            call scan(clus_desc, 6, position, len, ' ');
+19070 +            desc_short=substr(clus_desc, 1, position-1) || '...';
+19071 +            drop position len;
+19072 +            label desc_short="&descshort";
+19073 +        end;
+19074 +    run;
+19075 +
+19076 +    proc sql noprint;
+19077 +        create table &em_user_graph_table as
+19078 +        select _cluster_, clus_desc, freq, percent, *
+19079 +        from &em_user_graph_table;
+19080 +    quit;
+19081 +
+19082 +    %let block = %sysfunc(sasmsg(sashelp.tmine, rpt_text_clusters_title, NOQUOTE));
+19083 +
+19084 +    %let desc = %sysfunc(sasmsg(sashelp.tmine, rpt_text_prescore_title, NOQUOTE));
+19085 +    %EM_REPORT(KEY=PRESCORECODE, VIEWTYPE=SOURCE, DESCRIPTION=%nrbquote(&desc),
+19086 +              BLOCK=Scoring, AUTODISPLAY=N);
+19087 +
+19088 +    %let desc = %sysfunc(sasmsg(sashelp.tmine, rpt_text_clusfreqbyrms_title, NOQUOTE));
+19089 +    %EM_REPORT(KEY=GRAPH_TABLE, VIEWTYPE=SCATTER, X=FREQ, Y=_RMSSTD_, DESCRIPTION=%nrbquote(&desc),
+19090 +            BLOCK=%nrbquote(&block), AUTODISPLAY=Y, TIP=%if &em_property_nDescTerms > 5 %then desc_short; %else clus_desc;);
+19091 +
+19092 +    %let desc = %sysfunc(sasmsg(sashelp.tmine, rpt_text_clusters_title, NOQUOTE));
+19093 +    %EM_REPORT(KEY=GRAPH_TABLE, VIEWTYPE=DATA, DESCRIPTION=%nrbquote(&desc), BLOCK=%nrbquote(&block), AUTODISPLAY=Y);
+19094 +
+19095 +    %if &nclus > 2 %then %do;
+19096 +        data work.graph_table(drop=_cluster_);
+19097 +            set &em_user_graph_table;
+19098 +            cluster=put(_cluster_,best12.);
+19099 +        run;
+19100 +        proc distance data=work.graph_table out=work.graph_table method=EUCLID nostd;
+19101 +            var RATIO(_mean1-_mean&svdkeep);
+19102 +            id cluster;
+19103 +        run;
+19104 +        proc mds data=work.graph_table out=work.graph_table
+19105 +            level=ratio dimension=2 noprint;
+19106 +        run;
+19107 +        data work.graph_table;
+19108 +            set work.graph_table;
+19109 +            if _name_ ne '';
+19110 +            Cluster=input(substr(_name_,2),8.);
+19111 +            LABEL dim1='X' dim2='Y';
+19112 +        run;
+19113 +        proc sql noprint;
+19114 +            create table &em_user_graph_table as
+19115 +            select a.*, b.dim1, b.dim2
+19116 +            from &em_user_graph_table a, work.graph_table b
+19117 +            where a._cluster_=b.cluster;
+19118 +        quit;
+19119 +
+19120 +        %let desc = %sysfunc(sasmsg(sashelp.tmine, rpt_text_clusterdist_title, NOQUOTE));
+19121 +        %EM_REPORT(KEY=GRAPH_TABLE, VIEWTYPE=SCATTER, X=DIM1, Y=DIM2, BLOCK=%nrbquote(&BLOCK),
+19122 +            DESCRIPTION=%nrbquote(&desc), AUTODISPLAY=Y, TIP=%if &em_property_nDescTerms > 5 %then desc_short; %else clus_desc;,
+19123 +            GROUP=_CLUSTER_, LEGEND=N);
+19124 +    %end;
+19125 +    %else %do;
+19126 +        %put &em_codebar;
+19127 +        %let errormsg=%sysfunc(sasmsg(sashelp.tmine, EMTOOL.NODISTANCEREPORT_NOTE, NOQUOTE));
+19128 +        %put &errormsg;
+19129 +        %put &em_codebar;
+19130 +    %end;
+19131 +
+19132 +    %let desc = %sysfunc(sasmsg(sashelp.tmine, rpt_text_clusterfreq_title, NOQUOTE));
+19133 +    %EM_REPORT(KEY=GRAPH_TABLE, VIEWTYPE=PIE, X=_cluster_, Y=freq, DESCRIPTION=%nrbquote(&desc),
+19134 +        TOOLTIP=clus_desc, BLOCK=%nrbquote(&block), AUTODISPLAY=Y);
+19135 +
+19136 +    %if &EM_PROPERTY_ALGORITHM=2.0 %then %do;
+19137 +
+19138 +        proc sql noprint;
+19139 +            create table &em_user_hierds as
+19140 +            select level, _cluster_, parent, clus_desc, *
+19141 +            from &em_user_hierds;
+19142 +        quit;
+19143 +        filename temp catalog 'sashelp.emtext.tmsort.source';
+19144 +        %include temp;
+19145 +        %tmsort(data=&em_user_hierds, out=, by=level parent _cluster_);
+19146 +
+19147 +        data &em_user_hierds;
+19148 +            set &em_user_hierds;
+19149 +            label _cluster_="&clusterid"
+19150 +                  clus_desc="&descterms"
+19151 +                  freq="&frequency"
+19152 +                  parent="&parent"
+19153 +                  level="&hierlevel"
+19154 +                  graphdesc="&graphdesc";
+19155 +        run;
+19156 +        %let desc = %sysfunc(sasmsg(sashelp.tmine, rpt_text_clusterhierarchy_title, NOQUOTE));
+19157 +        %em_report(viewtype=constellation, linkkey=hierds, nodekey=hierds, method=HIERARCHY,
+19158 +            linkfrom=_CLUSTER_,linkto=PARENT,linkid=_cluster_,nodeid=_CLUSTER_,nodesize=FREQ,nodelabel=graphdesc,
+19159 +            nodetip=clus_desc, BLOCK=%nrbquote(&block), DESCRIPTION=%nrbquote(&desc), AUTODISPLAY=Y);
+19160 +
+19161 +        %let desc = %sysfunc(sasmsg(sashelp.tmine, rpt_text_hierarchydata_title, NOQUOTE));
+19162 +        %em_report(KEY=hierds, VIEWTYPE=data, DESCRIPTION=%nrbquote(&DESC), AUTODISPLAY=Y, BLOCK=%nrbquote(&BLOCK));
+19163 +    %end;
+19164 +
+19165 +    proc sql noprint;
+19166 +        drop table work.graph_table;
+19167 +    quit;
+19168 +
+19169 +%mend report;
+19170 +
+NOTE: %INCLUDE (level 1) ending.
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 10 observations read from the data set EMWS1.TEXTCLUSTER_CLUSTERS.
+NOTE: The data set EMWS1.TEXTCLUSTER_GRAPH_TABLE has 10 observations and 17 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.04 seconds
+      cpu time            0.01 seconds
+ 
+ 
+WARNING: This CREATE TABLE statement recursively references the target table. A consequence of this is a possible data integrity problem.
+WARNING: Variable clus_desc already exists on file EMWS1.TEXTCLUSTER_GRAPH_TABLE.
+WARNING: Variable _CLUSTER_ already exists on file EMWS1.TEXTCLUSTER_GRAPH_TABLE.
+WARNING: Variable freq already exists on file EMWS1.TEXTCLUSTER_GRAPH_TABLE.
+WARNING: Variable percent already exists on file EMWS1.TEXTCLUSTER_GRAPH_TABLE.
+NOTE: Table EMWS1.TEXTCLUSTER_GRAPH_TABLE created, with 10 rows and 17 columns.
+ 
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.09 seconds
+      cpu time            0.00 seconds
+ 
+ 
+ 
+NOTE: The data set WORK.EM_USER_REPORT has 132 observations and 4 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.03 seconds
+      cpu time            0.03 seconds
+ 
+ 
+ 
+NOTE: There were 132 observations read from the data set WORK.EM_USER_REPORT.
+NOTE: The data set WORK.EM_USER_REPORT has 265 observations and 4 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.04 seconds
+      cpu time            0.03 seconds
+ 
+ 
+ 
+NOTE: There were 265 observations read from the data set WORK.EM_USER_REPORT.
+NOTE: The data set WORK.EM_USER_REPORT has 397 observations and 4 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.03 seconds
+      cpu time            0.03 seconds
+ 
+ 
+ 
+NOTE: There were 10 observations read from the data set EMWS1.TEXTCLUSTER_GRAPH_TABLE.
+NOTE: The data set WORK.GRAPH_TABLE has 10 observations and 17 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.03 seconds
+ 
+ 
+ 
+WARNING: Found negative value(s) in the ratio variable(s). The distance matrix may be meaningless.
+NOTE: The data set WORK.GRAPH_TABLE has 10 observations and 11 variables.
+NOTE: PROCEDURE DISTANCE used (Total process time):
+      real time           0.03 seconds
+      cpu time            0.03 seconds
+ 
+ 
+ 
+NOTE: Convergence reached in 15 iterations.
+NOTE: The data set WORK.GRAPH_TABLE has 12 observations and 7 variables.
+NOTE: PROCEDURE MDS used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 12 observations read from the data set WORK.GRAPH_TABLE.
+NOTE: The data set WORK.GRAPH_TABLE has 10 observations and 8 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+ 
+ 
+WARNING: This CREATE TABLE statement recursively references the target table. A consequence of this is a possible data integrity problem.
+NOTE: Table EMWS1.TEXTCLUSTER_GRAPH_TABLE created, with 10 rows and 19 columns.
+ 
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.04 seconds
+      cpu time            0.01 seconds
+ 
+ 
+ 
+NOTE: There were 397 observations read from the data set WORK.EM_USER_REPORT.
+NOTE: The data set WORK.EM_USER_REPORT has 530 observations and 4 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.04 seconds
+      cpu time            0.04 seconds
+ 
+ 
+ 
+NOTE: There were 530 observations read from the data set WORK.EM_USER_REPORT.
+NOTE: The data set WORK.EM_USER_REPORT has 663 observations and 4 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.04 seconds
+      cpu time            0.04 seconds
+ 
+ 
+NOTE: Table WORK.GRAPH_TABLE has been dropped.
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+ 
+ 
+19171  *------------------------------------------------------------*;
+19172  * End REPORT: TextCluster;
+19173  *------------------------------------------------------------*;
+ 
+19174  /* Reset EM Options */
+19175  options formchar="|----|+|---+=|-/\<>*";
+19176  options nocenter ls=256 ps=10000;
+19177  goptions reset=all device=GIF NODISPLAY;
+ 
+19178  proc sort data=WORK.EM_USER_REPORT;
+19179  by ID VIEW;
+19180  run;
+ 
+NOTE: There were 663 observations read from the data set WORK.EM_USER_REPORT.
+NOTE: The data set WORK.EM_USER_REPORT has 663 observations and 4 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+ 
+ 

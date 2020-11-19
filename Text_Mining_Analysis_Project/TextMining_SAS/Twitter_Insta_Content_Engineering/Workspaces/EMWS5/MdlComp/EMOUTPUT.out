@@ -1,0 +1,137 @@
+*------------------------------------------------------------*
+User:                yas19006
+Date:                May 06, 2020
+Time:                18:34:24
+*------------------------------------------------------------*
+* Training Output
+*------------------------------------------------------------*
+ 
+ 
+ 
+ 
+Variable Summary
+ 
+          Measurement    Frequency
+ Role        Level         Count
+ 
+TARGET     INTERVAL          1
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+Fit Statistics
+Model Selection based on Valid: Average Squared Error (_VASE_)
+ 
+                                              Valid:          Train:
+                                              Average         Average            Train:
+Selected    Model                             Squared         Squared      Misclassification
+ Model       Node     Model Description        Error           Error              Rate
+ 
+   Y        Tree      Decision Tree         12124998.24      1727791.69            .
+            Neural    Neural Network       121831388.24     50461277.70            .
+            Boost     Gradient Boosting    230511069.67    105174114.92            .
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+Fit Statistics Table
+Target: Total_Actions
+ 
+Data Role=Train
+ 
+Statistics                                                    Tree             Neural              Boost
+ 
+Train: Akaike's Information Criterion                          .             48228.98                .
+Train: Average Squared Error                            1727791.69        50461277.70       105174114.92
+Train: Average Error Function                                  .          50461277.70                .
+Selection Criterion: Valid: Average Squared Error      12124998.24       121831388.24       230511069.67
+Train: Degrees of Freedom for Error                            .              2461.00                .
+Train: Model Degrees of Freedom                                .               232.00                .
+Train: Total Degrees of Freedom                            2693.00            2693.00            2693.00
+Train: Divisor for ASE                                     2693.00            2693.00            2693.00
+Train: Error Function                                          .      135892220857.40                .
+Train: Final Prediction Error                                  .          59975309.75                .
+Train: Maximum Absolute Error                             29279.14          122506.42          148590.38
+Train: Misclassification Rate                                  .                  .                  .
+Train: Mean Squared Error                                      .          55218293.73                .
+Train: Sum of Frequencies                                  2693.00            2693.00            2693.00
+Train: Number of Estimated Weights                             .               232.00                .
+Train: Root Average Squared Error                          1314.45            7103.61           10255.44
+Train: Root Final Prediction Error                             .              7744.37                .
+Train: Root Mean Squared Error                                 .              7430.90                .
+Train: Schwarz's Bayesian Criterion                            .             49597.41                .
+Train: Sum of Squared Errors                         4652943010.42    135892220857.40    283233891486.08
+Train: Sum of Case Weights Times Freq                          .              2693.00            2693.00
+Train: Number of Wrong Classifications                         .                  .                  .
+ 
+ 
+Data Role=Valid
+ 
+Statistics                                         Tree            Neural              Boost
+ 
+Valid: Average Squared Error                12124998.24      121831388.24       230511069.67
+Valid: Average Error Function                       .        121831388.24                .
+Valid: Divisor for VASE                          770.00            770.00             770.00
+Valid: Error Function                               .      93810168943.60                .
+Valid: Maximum Absolute Error                  88023.14         179591.00          209317.52
+Valid: Misclassification Rate                       .                 .                  .
+Valid: Mean Squared Error                           .        121831388.24                .
+Valid: Sum of Frequencies                        770.00            770.00             770.00
+Valid: Root Average Squared Error               3482.10          11037.73           15182.59
+Valid: Root Mean Squared Error                      .            11037.73                .
+Valid: Sum of Squared Errors              9336248647.44    93810168943.60    177493523645.01
+Valid: Sum of Case Weights Times Freq               .              770.00             770.00
+Valid: Number of Wrong Classifications              .                 .                  .
+ 
+ 
+Data Role=Test
+ 
+Statistics                                        Tree            Neural             Boost
+ 
+                                                   .                 .                 .
+                                                   .                 .                 .
+Test: Lower 95% Conf. Limit for TASE               .                 .                 .
+Test: Upper 95% Conf. Limit for TASE               .                 .                 .
+Test: Average Squared Error                 4328230.36       39070162.91       62170388.94
+Test: Average Error Function                       .         39070162.91               .
+Test: Divisor for TASE                          385.00            385.00            385.00
+Test: Error Function                               .      15042012721.91               .
+                                                   .                 .                 .
+                                                   .                 .                 .
+                                                   .                 .                 .
+                                                   .                 .                 .
+Test: Maximum Absolute Error                  32772.86          58980.51          88442.94
+Test: Misclassification Rate                       .                 .                 .
+Test: Lower 95% Conf. Limit for TMISC              .                 .                 .
+Test: Upper 95% Conf. Limit for TMISC              .                 .                 .
+Test: Mean Squared Error                           .         39070162.91               .
+Test: Sum of Frequencies                        385.00            385.00            385.00
+Test: Root Average Squared Error               2080.44           6250.61           7884.82
+Test: Root Mean Squared Error                      .             6250.61               .
+Test: Sum of Squared Errors              1666368690.04    15042012721.91    23935599742.75
+Test: Sum of Weights Times Freqs                385.00            385.00            385.00
+Test: Number of Wrong Classifications              .                 .                 .
+
+
+*------------------------------------------------------------*
+* Score Output
+*------------------------------------------------------------*
+
+
+*------------------------------------------------------------*
+* Report Output
+*------------------------------------------------------------*

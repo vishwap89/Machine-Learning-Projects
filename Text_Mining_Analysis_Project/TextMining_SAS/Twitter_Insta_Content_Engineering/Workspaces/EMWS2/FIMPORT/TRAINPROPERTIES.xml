@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" ?><_ROOT_  Location="CATALOG" Catalog="SASHELP.EMSAMP.Fimport.SOURCE" ImportType="Local" GuessRows="500"
+ Delimiter="," NameRow="Y" SkipRows="0" MaxRows="1000000" MaxCols="10000" FileType="csv"
+ Role="TRAIN" ForceRun="N" Summarize="N" AdvancedAdvisor="N" RunAction="Train" Component="FileImport"
+ IFileName="P:\Final Project\instagram.csv" AccessTable="NoTableName" UserID="NoUserID"
+ Password="NoPassword" RawCreateTime="1903224329.3" CreateTime="23APR2020:01:25:29"
+ RunId="cc3b6675-f5a5-4282-980b-2747bc9e1df9" RawLastTimeRun="1903258633.7" RawRunTime="10.17599988"
+ LastTimeRun="23APR2020:10:57:14" RunTime="0 Hr. 0 Min. 10.18 Sec.">
+<VARIABLEPROPERTIES/>
+<FILEPROPERTIES ><![CDATA[
+USERTRAINCODE
+USERSCORECODE
+USERREPORTCODE
+VARIABLESETDELTA
+DELTACODE
+]]>
+</FILEPROPERTIES></_ROOT_>

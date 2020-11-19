@@ -1,0 +1,469 @@
+*------------------------------------------------------------*
+* Report Log
+Date:                April 23, 2020
+Time:                10:27:49
+*------------------------------------------------------------*
+18182  %let EMEXCEPTIONSTRING=;
+18183  *------------------------------------------------------------*;
+18184  * REPORT: TextFilter;
+18185  *------------------------------------------------------------*;
+18186  %let EM_ACTION = REPORT;
+18187  %let syscc = 0;
+18188  %macro main();
+18189      %if %upcase("&EM_ACTION") eq "CREATE" %then %do;
+18190          filename temp catalog 'sashelp.emtxtext.filter_create.source';
+18191          %include temp;
+18192          %create();
+18193      %end;
+18194      %if %upcase("&EM_ACTION") eq "TRAIN" %then %do;
+18195          filename temp catalog 'sashelp.emtxtext.filter_train.source';
+18196          %include temp;
+18197          %train();
+18198      %end;
+18199      %if %upcase("&EM_ACTION") eq "SCORE" %then %do;
+18200          filename temp catalog 'sashelp.emtxtext.filter_score.source';
+18201          %include temp;
+18202          %score();
+18203      %end;
+18204      %if %upcase("&EM_ACTION") eq "REPORT" %then %do;
+18205          filename temp catalog 'sashelp.emtxtext.filter_report.source';
+18206          %include temp;
+18207         %report();
+18208      %end;
+18209       %if %upcase(&EM_ACTION) eq OPENTABLE1 %then %do;
+18210         filename temp catalog 'sashelp.emtxtext.filter_actions.source';
+18211         %include temp;
+18212         filename temp;
+18213         %openTable1;
+18214     %end;
+18215  %mend main;
+18216  
+18217  %main();
+NOTE: %INCLUDE (level 1) file TEMP is file SASHELP.EMTXTEXT.FILTER_REPORT.SOURCE.
+18218 +%MACRO REPORT();
+18220 +   %let last_parsing_node=;
+18221 +   %let lastTermid=;
+18222 +   %em_getname(key=tmconfig, type=data);
+18223 +    /* Get values for the macros needed by the node */
+18224 +   data work._tmconfig (drop=indexpath);
+18225 +      set &EM_USER_tmconfig;
+18226 +      call symput('lastTermid', lastfilternode);
+18227 +      call symput('last_parse_node', lastparsenode);
+18228 +   run;
+18230 +   %let lastTermid=%ktrim(&lastTermid);
+18231 +   /* include graphing macros */
+18232 +   FILENAME TEMP CATALOG 'SASHELP.EMTXTEXT.TM_GRAPHS.SOURCE';
+18233 +   %INCLUDE TEMP;
+18235 +   /* Retrieve  the Terms Table from Preceding Parsing or Filter Node */
+18236 +   proc sort data=&em_lib..&lastTermid._TERMS(Keep=KEEP ATTRIBUTE
+18237 +     ROLE _ISPAR TERM PARENT_ID FREQ NUMDOCS rename=(ATTRIBUTE=OLDATTRIBUTE ROLE=OLDROLE _ISPAR=_ISPAROLD TERM=OLDTERM FREQ=OLDFREQ NUMDOCS=OLDNUMDOCS))
+18238 +     out=_temp(drop=KEEP)
+18239 +      ;
+18240 +      by PARENT_ID;
+18241 +      %if "&last_parse_node" ne "&lastTermid" %then %do;
+18242 +          where KEEP='Y' and _ISPAROLD ne '.';
+18243 +      %end;
+18244 +      %else %do;
+18245 +         where _ISPAROLD ne '.';
+18246 +      %end;
+18247 +   run;
+18249 +   /* get the top level terms */
+18250 +   %EM_GETNAME(KEY=GRAPH_TABLE, TYPE=DATA);
+18251 +   %GRAPH_TOP_TERMS(KEY=GRAPH_TABLE, FILTER=Y);
+18253 +   proc sort data=&em_user_GRAPH_TABLE out=_temp2;
+18254 +      by PARENT_ID;
+18255 +   run;
+18256 +   data _temp3;
+18257 +      label TERM=       "%sysfunc(sasmsg(sashelp.tmine, rpt_text_term_vlabel,               NOQUOTE))"
+18258 +            ROLESTRING= "%sysfunc(sasmsg(sashelp.tmine, rpt_text_role_vlabel,               NOQUOTE))"
+18259 +            ATTRSTRING=  "%sysfunc(sasmsg(sashelp.tmine, rpt_text_attribute_vlabel,          NOQUOTE))"
+18260 +            STATUS=     "%sysfunc(sasmsg(sashelp.tmine, rpt_text_status_vlabel,             NOQUOTE))"
+18261 +            WEIGHT=     "%sysfunc(sasmsg(sashelp.tmine, rpt_text_weight_vlabel,             NOQUOTE))"
+18262 +            OLDFREQ=    "%sysfunc(sasmsg(sashelp.tmine, rpt_text_importedfreq_vlabel,       NOQUOTE))"
+18263 +            FREQ=       "%sysfunc(sasmsg(sashelp.tmine, rpt_text_freq_vlabel,               NOQUOTE))"
+18264 +            OLDNUMDOCS= "%sysfunc(sasmsg(sashelp.tmine, rpt_text_importednumdocs_vlabel,    NOQUOTE))"
+18265 +            NUMDOCS=    "%sysfunc(sasmsg(sashelp.tmine, rpt_text_numdocs_vlabel,            NOQUOTE))"
+18266 +            RANK      = "%sysfunc(sasmsg(sashelp.tmine, rpt_text_rank_vlabel,         NOQUOTE))";
+18267 +      format weight 5.3;
+18268 +      merge _temp2 _temp;
+18269 +      length STATUS $20;
+18270 +      label _ISPAROLD=  "%sysfunc(sasmsg(sashelp.tmine, rpt_text_importedisparent_vlabel ,  NOQUOTE))";
+18272 +      by PARENT_ID;
+18274 +      if TERM = '' and OLDTERM ne '' then do;
+18275 +         TERM=OLDTERM;
+18276 +         KEEP = 'N';
+18277 +      end;
+18278 +      if KEEP= 'Y' then
+18279 +         STATUS = "%sysfunc(sasmsg(sashelp.tmine, rpt_keep_value, NOQUOTE))";
+18280 +      else
+18281 +         STATUS = "%sysfunc(sasmsg(sashelp.tmine, rpt_drop_value, NOQUOTE))";
+18282 +       drop OLDTERM;
+18283 +   run;
+18285 +   * sort by numdocs for the reports graph ;
+18286 +   proc sort data=_temp3;
+18287 +      by descending numdocs;
+18288 +   run;
+18290 +   %EM_GETNAME(KEY=DELETEDTERMS, TYPE=DATA);
+18291 +   data &em_user_deletedTerms;
+18292 +      set _temp3(where=(FREQ=. or KEEP='N') DROP=NUMDOCS WEIGHT OLDROLE OLDATTRIBUTE _ISPAR _ISPAROLD);
+18293 +       %if "%upcase(&em_property_maxviewterms)" ne "ALL" %then %do;
+18294 +           if _N_<=&em_property_maxviewterms then output;
+18295 +       %end;
+18296 +       label OLDROLESTRING    =   "%sysfunc(sasmsg(sashelp.tmine, rpt_text_role_vlabel,       NOQUOTE))"
+18297 +             ATTRSTRING=  "%sysfunc(sasmsg(sashelp.tmine, rpt_text_attribute_vlabel,  NOQUOTE))"
+18298 +             STATUS=     "%sysfunc(sasmsg(sashelp.tmine, rpt_text_status_vlabel,             NOQUOTE))";
+18301 +       drop FREQ KEEP;
+18302 +   run;
+18303 +   proc sort data=&em_user_deletedTerms;
+18304 +      by descending OLDNUMDOCS;
+18305 +   run;
+18307 +   %EM_GETNAME(KEY=NEWTERMS, TYPE=DATA);
+18308 +   data &em_user_newTerms;
+18309 +      set _temp3(where=(_ISPAR="+" and _ISPAROLD="" and KEEP='Y') drop=OLDNUMDOCS  OLDFREQ OLDROLE OLDATTRIBUTE);
+18310 +      drop _ISPAR _ISPAROLD KEEP;
+18311 +       %if "%upcase(&em_property_maxviewterms)" ne "ALL" %then %do;
+18312 +           if _N_<=&em_property_maxviewterms then output;
+18313 +       %end;
+18314 +   run;
+18316 +   proc sort data=&em_user_newTerms;
+18317 +       by term;
+18318 +   run;
+18321 +   %let where=(where=(FREQ ne .) DROP=KEEP OLDROLE OLDATTRIBUTE _ISPAROLD);
+18322 +   %if ("&em_property_resultTerms" ne "") and  ("&em_property_resultTerms" ne "ALL")  %then %do;
+18323 +       %if "&em_property_resultTerms"="FILTERED" %then %let where= (where=(keep="N" and (FREQ ne .)));
+18324 +       %else
+18325 +           %if "&&em_property_resultTerms"="SELECTED" %then %let where= (where=(keep="Y" and (FREQ ne .)));
+18326 +   %end;
+18328 +   %let numdocsdiff= 0;
+18329 +   data &em_user_GRAPH_TABLE;
+18330 +      retain numdocsdiff 0;
+18331 +      set _temp3&where end=eof;
+18332 +      drop numdocsdiff;
+18333 +      %if "%upcase(&em_property_maxviewterms)" ne "ALL" %then %do;
+18334 +          if _N_<=&em_property_maxviewterms then output;
+18335 +          if NUMDOCS ne OLDNUMDOCS then numdocsdiff=1;
+18336 +      %end;
+18338 +      if eof and numdocsdiff then call symput('numdocsdiff', '1');
+18339 +   run;
+18341 +  %if ^%symexist(tm_debug) %then %let tm_debug=0;
+18342 +   %if &tm_debug =0 %then %do;
+18343 +      proc sql noprint;
+18344 +         drop table _temp;
+18345 +         drop table _temp2;
+18346 +         drop table _temp3;
+18347 +         drop table _tmconfig;
+18348 +      quit;
+18349 +   %end;
+18351 +   /* term freq by term weight */
+18352 +   %let block = %sysfunc(sasmsg(sashelp.tmine, rpt_text_terms_title, NOQUOTE));
+18354 +   %let desc = %sysfunc(sasmsg(sashelp.tmine, rpt_text_docsbyweight_title, NOQUOTE));
+18355 +   %EM_REPORT(KEY=GRAPH_TABLE, VIEWTYPE=SCATTER, X=NUMDOCS, Y=WEIGHT, TIPTEXT=TERM, DESCRIPTION=%nrbquote(&desc), BLOCK=%nrbquote(&block), AUTODISPLAY=Y);
+18357 +   /* frequency graph */
+18358 +   %let desc = %sysfunc(sasmsg(sashelp.tmine, rpt_text_docsbyfreq_title, NOQUOTE));
+18359 +   %EM_REPORT(KEY=GRAPH_TABLE, VIEWTYPE=SCATTER, X=NUMDOCS, Y=FREQ, TIPTEXT=TERM, DESCRIPTION= %nrbquote(&desc), BLOCK=%nrbquote(&block), AUTODISPLAY=Y);
+18361 +   /* terms by role */
+18362 +   %let desc = %sysfunc(sasmsg(sashelp.tmine, rpt_text_rolebyfreq_title, NOQUOTE));
+18363 +   %EM_REPORT(KEY=GRAPH_TABLE, VIEWTYPE=BAR, X=ROLESTRING, FREQ=FREQ, GROUP=STATUS, TIPTEXT=ROLE, sortorder=asc, BLOCK=%nrbquote(&block), DESCRIPTION=%nrbquote(&desc), AUTODISPLAY=Y);
+18365 +   /* terms by attribute */
+18366 +   %let desc = %sysfunc(sasmsg(sashelp.tmine, rpt_text_attributebyfreq_title, NOQUOTE));
+18367 +   %EM_REPORT(KEY=GRAPH_TABLE, VIEWTYPE=BAR, X=ATTRSTRING, FREQ=FREQ, GROUP=STATUS, DESCRIPTION=%nrbquote(&desc), BLOCK=%nrbquote(&block), AUTODISPLAY=Y);
+18369 +   /* zipf plot */
+18370 +   %let desc = %sysfunc(sasmsg(sashelp.tmine, rpt_text_zipf_title, NOQUOTE));
+18371 +   %EM_REPORT(KEY=GRAPH_TABLE, VIEWTYPE=SCATTER, X=rank, Y=numdocs,  TIPTEXT=term,  DESCRIPTION=%nrbquote(&desc), BLOCK=%nrbquote(&block), AUTODISPLAY=Y);
+18374 +   %let desc = %sysfunc(sasmsg(sashelp.tmine, rpt_text_prescore_title, NOQUOTE));
+18375 +   %EM_REPORT(KEY=PRESCORECODE, VIEWTYPE=SOURCE, DESCRIPTION=%nrbquote(&desc), BLOCK=Scoring, AUTODISPLAY=N);
+18377 +   %let block = %sysfunc(sasmsg(sashelp.tmine, rpt_text_filtering_title, NOQUOTE));
+18379 +   %if "&numdocsdiff" = "1" %then %do;
+18380 +        %let desc = %sysfunc(sasmsg(sashelp.tmine, rpt_text_numdocs_title, NOQUOTE));
+18381 +       %EM_REPORT(KEY=GRAPH_TABLE, VIEWTYPE=SCATTER, X=OLDNUMDOCS, Y=NUMDOCS, TIPTEXT=TERM, COLOR=WEIGHT, DESCRIPTION=%nrbquote(&desc), BLOCK=%nrbquote(&block), where=%str(NUMDOCS ne OLDNUMDOCS), AUTODISPLAY=N);
+18382 +   %end;
+18384 +   %let desc = %sysfunc(sasmsg(sashelp.tmine, rpt_text_deletedterms_title, NOQUOTE));
+18385 +   %EM_REPORT(KEY=DELETEDTERMS, VIEWTYPE=DATA, DESCRIPTION=%nrbquote(&desc), BLOCK=%nrbquote(&block), AUTODISPLAY=N);
+18387 +   %let desc = %sysfunc(sasmsg(sashelp.tmine, rpt_text_newterms_title, NOQUOTE));
+18388 +   %EM_REPORT(KEY=NEWTERMS, VIEWTYPE=DATA, DESCRIPTION=%nrbquote(&desc), BLOCK=%nrbquote(&block), AUTODISPLAY=N);
+18390 +%MEND REPORT;
+NOTE: %INCLUDE (level 1) ending.
+
+NOTE: There were 1 observations read from the data set EMWS1.TEXTFILTER_TMCONFIG.
+NOTE: The data set WORK._TMCONFIG has 1 observations and 28 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+      
+
+NOTE: %INCLUDE (level 1) file TEMP is file SASHELP.EMTXTEXT.TM_GRAPHS.SOURCE.
+18391 +%MACRO GRAPH_TOP_TERMS(KEY=, MAXTERMS=ALL, FILTER=N, KEEPKEY=N, termds=);
+18392 +/*
+18393 + * A gtable of all "top-level" terms, that is, all terms that do not have a different term as a parent.  This
+18394 + * table would be linked to all graphs in this window such that the rows in the table are selected when points
+18395 + * representing those terms are selected in the graphs.
+18396 + */
+18397 +
+18398 +   %em_getname(key=&key);
+18399 +   %LOCAL GRAPH_DATA;
+18400 +   %LET GRAPH_DATA = &&EM_USER_&KEY;
+18401 +   %if ^%symexist(tm_debug) %then %let tm_debug=0;
+18402 +   %if "&FILTER"="Y" %then %do;
+18403 +       %em_getname(key=terms_tmf, type=data);
+18404 +       * sort by freq for the reports graph ;
+18405 +       proc sort data=&EM_USER_TERMS_tmf out=_sortedTerms;
+18406 +          by descending numdocs;
+18407 +       run;
+18408 +   %end;
+18409 +   %else %do;
+18410 +      %if &termds= %then %do;
+18411 +         %let termds=&em_user_terms;
+18412 +         %em_getname(key=terms, type=data);
+18413 +         %end;
+18414 +
+18415 +       * sort by freq for the reports graph ;
+18416 +       proc sort data=&termds out=_sortedTerms;
+18417 +          by descending numdocs;
+18418 +       run;
+18419 +   %end;
+18420 +
+18421 +
+18422 +   data &GRAPH_DATA;
+18423 +      FORMAT TERM $256.;
+18424 +      SET _sortedTerms(drop=PARENT %IF &keepkey=N %THEN KEY; where=(_ISPAR ne '.'));
+18425 +      LABEL ROLESTRING= "%sysfunc(sasmsg(sashelp.tmine, rpt_text_role_vlabel,NOQUOTE))"
+18426 +            NUMDOCS=    "%sysfunc(sasmsg(sashelp.tmine, rpt_text_numdocs_vlabel,   NOQUOTE))"
+18427 +            RANK= "%sysfunc(sasmsg(sashelp.tmine, rpt_text_rank_vlabel,   NOQUOTE))"
+18428 +            FREQ=       "%sysfunc(sasmsg(sashelp.tmine, rpt_text_freq_vlabel,      NOQUOTE))"
+18429 +            ATTRSTRING=  "%sysfunc(sasmsg(sashelp.tmine, rpt_text_attribute_vlabel, NOQUOTE))"
+18430 +            %if "&FILTER"="Y" %then %do;
+18431 +                WEIGHT          = "%sysfunc(sasmsg(sashelp.tmine, rpt_text_weight_vlabel,             NOQUOTE))"
+18432 +           %end;
+18433 +            KEEP=       "%sysfunc(sasmsg(sashelp.tmine, rpt_text_keep_vlabel,      NOQUOTE))"
+18434 +            PARENT_ID=  "%sysfunc(sasmsg(sashelp.tmine, rpt_text_parentid_vlabel,  NOQUOTE))"
+18435 +            _ISPAR=     "%sysfunc(sasmsg(sashelp.tmine, rpt_text_isparent_vlabel,  NOQUOTE))";
+18436 +       drop ROLE ATTRIBUTE;
+18437 +      /* mark the parents */
+18438 +      IF _ISPAR = '+' THEN TERM = '+ ' || TERM;
+18439 +       %if "%upcase(&MAXTERMS)" ne "ALL" %then %do;
+18440 +           if _N_<=&maxterms then output;
+18441 +       %end;
+18442 +    run;
+18443 +
+18444 +
+18445 +
+18446 +    proc rank data=&graph_data out=&graph_data descending ties=low;
+18447 +       var numdocs;
+18448 +       ranks Rank;
+18449 +    run;
+18450 +
+18451 +
+18452 +
+18453 +
+18454 +
+18455 +    %if &tm_debug =0 %then %do;
+18456 +       proc datasets lib=work nolist;
+18457 +          delete _sortedTerms ;
+18458 +       run;
+18459 +    %end;
+18460 +
+18461 +
+18462 +    quit;
+18463 +
+18464 +
+18465 +   %let block = %sysfunc(sasmsg(sashelp.tmine, rpt_text_terms_title, NOQUOTE));
+18466 +
+18467 +   %let desc = %sysfunc(sasmsg(sashelp.tmine, rpt_text_terms_title, NOQUOTE));
+18468 +   %EM_REPORT(KEY=&KEY, VIEWTYPE=DATA, DESCRIPTION= %nrbquote(&desc), BLOCK= %nrbquote(&block), AUTODISPLAY=Y, where=%str(KEEP='Y'));
+18469 +
+18470 +%MEND GRAPH_TOP_TERMS;
+NOTE: %INCLUDE (level 1) ending.
+
+NOTE: There were 8492 observations read from the data set EMWS1.TEXTPARSING_TERMS.
+      WHERE _ISPAROLD not = '.';
+NOTE: The data set WORK._TEMP has 8492 observations and 7 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.03 seconds
+      cpu time            0.00 seconds
+      
+
+
+NOTE: There were 12214 observations read from the data set EMWS1.TEXTFILTER_TERMS_TMF.
+NOTE: The data set WORK._SORTEDTERMS has 12214 observations and 13 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.06 seconds
+      cpu time            0.06 seconds
+      
+
+
+NOTE: Variable RANK is uninitialized.
+NOTE: There were 8492 observations read from the data set WORK._SORTEDTERMS.
+      WHERE _ISPAR not = '.';
+NOTE: The data set EMWS1.TEXTFILTER_GRAPH_TABLE has 8492 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.09 seconds
+      cpu time            0.04 seconds
+      
+
+
+NOTE: The data set EMWS1.TEXTFILTER_GRAPH_TABLE has 8492 observations and 10 variables.
+NOTE: PROCEDURE RANK used (Total process time):
+      real time           0.17 seconds
+      cpu time            0.04 seconds
+      
+
+
+NOTE: The data set WORK.EM_USER_REPORT has 133 observations and 4 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.04 seconds
+      cpu time            0.04 seconds
+      
+
+
+NOTE: There were 8492 observations read from the data set EMWS1.TEXTFILTER_GRAPH_TABLE.
+NOTE: The data set WORK._TEMP2 has 8492 observations and 10 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.05 seconds
+      cpu time            0.00 seconds
+      
+
+
+NOTE: There were 8492 observations read from the data set WORK._TEMP2.
+NOTE: There were 8492 observations read from the data set WORK._TEMP.
+NOTE: The data set WORK._TEMP3 has 8492 observations and 16 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.06 seconds
+      cpu time            0.04 seconds
+      
+
+
+NOTE: There were 8492 observations read from the data set WORK._TEMP3.
+NOTE: The data set WORK._TEMP3 has 8492 observations and 16 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.03 seconds
+      
+
+
+NOTE: Variable OLDROLESTRING is uninitialized.
+NOTE: There were 6921 observations read from the data set WORK._TEMP3.
+      WHERE (FREQ=.) or (KEEP='N');
+NOTE: The data set EMWS1.TEXTFILTER_DELETEDTERMS has 6921 observations and 8 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.08 seconds
+      cpu time            0.01 seconds
+      
+
+
+NOTE: There were 6921 observations read from the data set EMWS1.TEXTFILTER_DELETEDTERMS.
+NOTE: The data set EMWS1.TEXTFILTER_DELETEDTERMS has 6921 observations and 8 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.12 seconds
+      cpu time            0.00 seconds
+      
+
+
+NOTE: There were 0 observations read from the data set WORK._TEMP3.
+      WHERE (_ISPAR='+') and (_ISPAROLD=' ') and (KEEP='Y');
+NOTE: The data set EMWS1.TEXTFILTER_NEWTERMS has 0 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.05 seconds
+      cpu time            0.03 seconds
+      
+
+
+NOTE: Input data set is empty.
+NOTE: The data set EMWS1.TEXTFILTER_NEWTERMS has 0 observations and 9 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.05 seconds
+      cpu time            0.00 seconds
+      
+
+
+NOTE: There were 8492 observations read from the data set WORK._TEMP3.
+      WHERE FREQ not = .;
+NOTE: The data set EMWS1.TEXTFILTER_GRAPH_TABLE has 8492 observations and 12 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.10 seconds
+      cpu time            0.01 seconds
+      
+
+
+NOTE: There were 133 observations read from the data set WORK.EM_USER_REPORT.
+NOTE: The data set WORK.EM_USER_REPORT has 266 observations and 4 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.04 seconds
+      cpu time            0.03 seconds
+      
+
+
+NOTE: There were 266 observations read from the data set WORK.EM_USER_REPORT.
+NOTE: The data set WORK.EM_USER_REPORT has 399 observations and 4 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.03 seconds
+      cpu time            0.03 seconds
+      
+
+
+NOTE: There were 399 observations read from the data set WORK.EM_USER_REPORT.
+NOTE: The data set WORK.EM_USER_REPORT has 531 observations and 4 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.03 seconds
+      cpu time            0.03 seconds
+      
+
+
+NOTE: There were 531 observations read from the data set WORK.EM_USER_REPORT.
+NOTE: The data set WORK.EM_USER_REPORT has 663 observations and 4 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.04 seconds
+      cpu time            0.04 seconds
+      
+
+
+NOTE: There were 663 observations read from the data set WORK.EM_USER_REPORT.
+NOTE: The data set WORK.EM_USER_REPORT has 796 observations and 4 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.03 seconds
+      cpu time            0.03 seconds
+      
+
+
+NOTE: There were 796 observations read from the data set WORK.EM_USER_REPORT.
+NOTE: The data set WORK.EM_USER_REPORT has 928 observations and 4 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.04 seconds
+      cpu time            0.03 seconds
+      
+
+
+NOTE: There were 928 observations read from the data set WORK.EM_USER_REPORT.
+NOTE: The data set WORK.EM_USER_REPORT has 1060 observations and 4 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.04 seconds
+      cpu time            0.03 seconds
+      
+
+
+NOTE: There were 1060 observations read from the data set WORK.EM_USER_REPORT.
+NOTE: The data set WORK.EM_USER_REPORT has 1192 observations and 4 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.03 seconds
+      cpu time            0.03 seconds
+      
+
+18471  *------------------------------------------------------------*;
+18472  * End REPORT: TextFilter;
+18473  *------------------------------------------------------------*;
+
+18474  /* Reset EM Options */
+18475  options formchar="|----|+|---+=|-/\<>*";
+18476  options nocenter ls=256 ps=10000;
+18477  goptions reset=all device=GIF NODISPLAY;
+
+18478  proc sort data=WORK.EM_USER_REPORT;
+18479  by ID VIEW;
+18480  run;
+
+NOTE: There were 1192 observations read from the data set WORK.EM_USER_REPORT.
+NOTE: The data set WORK.EM_USER_REPORT has 1192 observations and 4 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+      
+

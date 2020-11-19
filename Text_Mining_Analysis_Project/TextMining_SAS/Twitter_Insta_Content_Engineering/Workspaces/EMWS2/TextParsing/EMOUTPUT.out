@@ -1,0 +1,65 @@
+*------------------------------------------------------------*
+User:                yas19006
+Date:                May 06, 2020
+Time:                15:53:15
+*------------------------------------------------------------*
+* Training Output
+*------------------------------------------------------------*
+ 
+ 
+ 
+ 
+Variable Summary
+ 
+        Measurement    Frequency
+Role       Level         Count
+ 
+TEXT      NOMINAL          1
+ 
+ 
+ 
+ 
+ 
+The HPTMINE Procedure
+ 
+      Performance Information
+ 
+Execution Mode       Single-Machine
+Number of Threads    2
+ 
+ 
+                  Data Access Information
+ 
+Data                          Engine    Role      Path
+ 
+EMWS2.TEXTPARSING_TRAIN       V9        Input     On Client
+EMWS2.TEXTPARSING_TMOUTPOS    V9        Output    On Client
+EMWS2.TEXTPARSING_TMOUT       V9        Output    On Client
+EMWS2.TEXTPARSING_TERMS       V9        Output    On Client
+EMWS2.TEXTPARSING_TMCONFIG    V9        Output    On Client
+ 
+ 
+                 Procedure Task Timing
+ 
+Task                                Seconds     Percent
+ 
+ Parse documents                       5.51     78.94%
+ Index documents                       0.56      8.01%
+ Output raw parsing results            0.02      0.33%
+ Analyze terms                         0.35      5.05%
+ Obtain term frequency                 0.32      4.53%
+ Filter terms                          0.17      2.41%
+ Generate term-document matrix         0.00      0.06%
+ Output OUTCHILD table                 0.01      0.17%
+ Output OUTTERMS table                 0.01      0.16%
+ Output OUTCONFIG table                0.02      0.34%
+
+
+*------------------------------------------------------------*
+* Score Output
+*------------------------------------------------------------*
+
+
+*------------------------------------------------------------*
+* Report Output
+*------------------------------------------------------------*

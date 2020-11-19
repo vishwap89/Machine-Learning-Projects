@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" ?><_ROOT_  Location="CATALOG" Catalog="SASHELP.EMTXTEXT.FILTER.SOURCE" spellCheck="N" spellSensitivity="Med"
+ cellWeight="LOG" termWeight="IDF" minDocs="4" maxTerms="." resultTerms="ALL" maxviewTerms="20000"
+ ForceRun="N" RunAction="Train" Component="TextFilter" spellDict="" searchPhrase=""
+ searchVar="" whereDoc="" lastfilternode="" lastparsenode="" synonymImport="" saveSynDS=""
+ spellDS="" RawCreateTime="1903225666.6" CreateTime="23APR2020:01:47:47" interStopDS=""
+ interSynDS="" filters="" RunId="82f1c48a-7771-4bc6-a696-b117c8618203" RawLastTimeRun="1903256860.2"
+ RawRunTime="12.434000015" LastTimeRun="23APR2020:10:27:40" RunTime="0 Hr. 0 Min. 12.43 Sec."
+>
+<VARIABLEPROPERTIES/>
+<FILEPROPERTIES ><![CDATA[
+USERTRAINCODE
+USERSCORECODE
+USERREPORTCODE
+SYNONYMIMPORT
+]]>
+</FILEPROPERTIES></_ROOT_>

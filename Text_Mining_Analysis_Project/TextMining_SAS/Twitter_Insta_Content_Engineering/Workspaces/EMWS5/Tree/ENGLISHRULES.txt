@@ -1,0 +1,470 @@
+*------------------------------------------------------------*
+ Node = 15
+*------------------------------------------------------------*
+if Like Count >= 94861.5
+then 
+ Tree Node Identifier   = 15
+ Number of Observations = 7
+ Predicted: Total_Actions = 158441.85714
+ 
+*------------------------------------------------------------*
+ Node = 29
+*------------------------------------------------------------*
+if Like Count < 94861.5 AND Like Count >= 73445.5
+then 
+ Tree Node Identifier   = 29
+ Number of Observations = 9
+ Predicted: Total_Actions = 102068.22222
+ 
+*------------------------------------------------------------*
+ Node = 42
+*------------------------------------------------------------*
+if Like Count < 18993.5 AND Like Count >= 17187.5
+then 
+ Tree Node Identifier   = 42
+ Number of Observations = 61
+ Predicted: Total_Actions = 21422.754098
+ 
+*------------------------------------------------------------*
+ Node = 49
+*------------------------------------------------------------*
+if Like Count < 42625.5 AND Like Count >= 36968
+then 
+ Tree Node Identifier   = 49
+ Number of Observations = 39
+ Predicted: Total_Actions = 47490.128205
+ 
+*------------------------------------------------------------*
+ Node = 50
+*------------------------------------------------------------*
+if Like Count < 47978.5 AND Like Count >= 42625.5 or MISSING
+then 
+ Tree Node Identifier   = 50
+ Number of Observations = 29
+ Predicted: Total_Actions = 54199.655172
+ 
+*------------------------------------------------------------*
+ Node = 52
+*------------------------------------------------------------*
+if Like Count < 54811.5 AND Like Count >= 50758.5
+then 
+ Tree Node Identifier   = 52
+ Number of Observations = 11
+ Predicted: Total_Actions = 64541.727273
+ 
+*------------------------------------------------------------*
+ Node = 54
+*------------------------------------------------------------*
+if TextCluster_SVD39 < -0.0165
+AND Like Count < 73445.5 AND Like Count >= 61279 or MISSING
+then 
+ Tree Node Identifier   = 54
+ Number of Observations = 7
+ Predicted: Total_Actions = 86650.857143
+ 
+*------------------------------------------------------------*
+ Node = 56
+*------------------------------------------------------------*
+if Like Count < 1003
+then 
+ Tree Node Identifier   = 56
+ Number of Observations = 109
+ Predicted: Total_Actions = 681.48623853
+ 
+*------------------------------------------------------------*
+ Node = 57
+*------------------------------------------------------------*
+if Like Count < 1744 AND Like Count >= 1003 or MISSING
+then 
+ Tree Node Identifier   = 57
+ Number of Observations = 160
+ Predicted: Total_Actions = 1606.6625
+ 
+*------------------------------------------------------------*
+ Node = 58
+*------------------------------------------------------------*
+if Like Count < 2366.5 AND Like Count >= 1744
+then 
+ Tree Node Identifier   = 58
+ Number of Observations = 137
+ Predicted: Total_Actions = 2372.7007299
+ 
+*------------------------------------------------------------*
+ Node = 59
+*------------------------------------------------------------*
+if Like Count < 2944.5 AND Like Count >= 2366.5 or MISSING
+then 
+ Tree Node Identifier   = 59
+ Number of Observations = 150
+ Predicted: Total_Actions = 3088.3466667
+ 
+*------------------------------------------------------------*
+ Node = 60
+*------------------------------------------------------------*
+if Like Count < 3480.5 AND Like Count >= 2944.5
+then 
+ Tree Node Identifier   = 60
+ Number of Observations = 125
+ Predicted: Total_Actions = 3693.928
+ 
+*------------------------------------------------------------*
+ Node = 61
+*------------------------------------------------------------*
+if Like Count < 4050.5 AND Like Count >= 3480.5 or MISSING
+then 
+ Tree Node Identifier   = 61
+ Number of Observations = 146
+ Predicted: Total_Actions = 4424.8219178
+ 
+*------------------------------------------------------------*
+ Node = 62
+*------------------------------------------------------------*
+if Like Count < 4674 AND Like Count >= 4050.5 or MISSING
+then 
+ Tree Node Identifier   = 62
+ Number of Observations = 179
+ Predicted: Total_Actions = 5067.4078212
+ 
+*------------------------------------------------------------*
+ Node = 63
+*------------------------------------------------------------*
+if Like Count < 5354.5 AND Like Count >= 4674
+then 
+ Tree Node Identifier   = 63
+ Number of Observations = 131
+ Predicted: Total_Actions = 5833.8244275
+ 
+*------------------------------------------------------------*
+ Node = 64
+*------------------------------------------------------------*
+if Like Count < 6042.5 AND Like Count >= 5354.5 or MISSING
+then 
+ Tree Node Identifier   = 64
+ Number of Observations = 110
+ Predicted: Total_Actions = 6633.5727273
+ 
+*------------------------------------------------------------*
+ Node = 65
+*------------------------------------------------------------*
+if Like Count < 6503.5 AND Like Count >= 6042.5
+then 
+ Tree Node Identifier   = 65
+ Number of Observations = 79
+ Predicted: Total_Actions = 7309.0886076
+ 
+*------------------------------------------------------------*
+ Node = 66
+*------------------------------------------------------------*
+if Like Count < 7226.5 AND Like Count >= 6503.5 or MISSING
+then 
+ Tree Node Identifier   = 66
+ Number of Observations = 129
+ Predicted: Total_Actions = 8068.1937984
+ 
+*------------------------------------------------------------*
+ Node = 67
+*------------------------------------------------------------*
+if Like Count < 7849.5 AND Like Count >= 7226.5
+then 
+ Tree Node Identifier   = 67
+ Number of Observations = 98
+ Predicted: Total_Actions = 8777.4897959
+ 
+*------------------------------------------------------------*
+ Node = 68
+*------------------------------------------------------------*
+if Retweet Count < 1714 or MISSING
+AND Like Count < 9086 AND Like Count >= 7849.5 or MISSING
+then 
+ Tree Node Identifier   = 68
+ Number of Observations = 117
+ Predicted: Total_Actions = 9763.957265
+ 
+*------------------------------------------------------------*
+ Node = 69
+*------------------------------------------------------------*
+if Retweet Count >= 1714
+AND Like Count < 9086 AND Like Count >= 7849.5 or MISSING
+then 
+ Tree Node Identifier   = 69
+ Number of Observations = 35
+ Predicted: Total_Actions = 10624.285714
+ 
+*------------------------------------------------------------*
+ Node = 70
+*------------------------------------------------------------*
+if Retweet Count < 1738.5 or MISSING
+AND Like Count < 10555 AND Like Count >= 9086
+then 
+ Tree Node Identifier   = 70
+ Number of Observations = 74
+ Predicted: Total_Actions = 11125.405405
+ 
+*------------------------------------------------------------*
+ Node = 71
+*------------------------------------------------------------*
+if Retweet Count >= 1738.5
+AND Like Count < 10555 AND Like Count >= 9086
+then 
+ Tree Node Identifier   = 71
+ Number of Observations = 62
+ Predicted: Total_Actions = 12079.951613
+ 
+*------------------------------------------------------------*
+ Node = 72
+*------------------------------------------------------------*
+if Retweet Count < 1943.5
+AND Like Count < 12214 AND Like Count >= 10555 or MISSING
+then 
+ Tree Node Identifier   = 72
+ Number of Observations = 48
+ Predicted: Total_Actions = 12852.625
+ 
+*------------------------------------------------------------*
+ Node = 73
+*------------------------------------------------------------*
+if Retweet Count >= 1943.5 or MISSING
+AND Like Count < 12214 AND Like Count >= 10555 or MISSING
+then 
+ Tree Node Identifier   = 73
+ Number of Observations = 69
+ Predicted: Total_Actions = 14001.536232
+ 
+*------------------------------------------------------------*
+ Node = 74
+*------------------------------------------------------------*
+if Retweet Count < 2136
+AND Like Count < 13795.5 AND Like Count >= 12214
+then 
+ Tree Node Identifier   = 74
+ Number of Observations = 41
+ Predicted: Total_Actions = 14740.97561
+ 
+*------------------------------------------------------------*
+ Node = 75
+*------------------------------------------------------------*
+if Retweet Count >= 2136 or MISSING
+AND Like Count < 13795.5 AND Like Count >= 12214
+then 
+ Tree Node Identifier   = 75
+ Number of Observations = 58
+ Predicted: Total_Actions = 15928.862069
+ 
+*------------------------------------------------------------*
+ Node = 76
+*------------------------------------------------------------*
+if Retweet Count < 2779.5 or MISSING
+AND Like Count < 15594.5 AND Like Count >= 13795.5 or MISSING
+then 
+ Tree Node Identifier   = 76
+ Number of Observations = 49
+ Predicted: Total_Actions = 16885.918367
+ 
+*------------------------------------------------------------*
+ Node = 77
+*------------------------------------------------------------*
+if Retweet Count >= 2779.5
+AND Like Count < 15594.5 AND Like Count >= 13795.5 or MISSING
+then 
+ Tree Node Identifier   = 77
+ Number of Observations = 33
+ Predicted: Total_Actions = 18106
+ 
+*------------------------------------------------------------*
+ Node = 78
+*------------------------------------------------------------*
+if Retweet Count < 3274 or MISSING
+AND Like Count < 17187.5 AND Like Count >= 15594.5
+then 
+ Tree Node Identifier   = 78
+ Number of Observations = 32
+ Predicted: Total_Actions = 18886.5625
+ 
+*------------------------------------------------------------*
+ Node = 79
+*------------------------------------------------------------*
+if Retweet Count >= 3274
+AND Like Count < 17187.5 AND Like Count >= 15594.5
+then 
+ Tree Node Identifier   = 79
+ Number of Observations = 22
+ Predicted: Total_Actions = 20228.318182
+ 
+*------------------------------------------------------------*
+ Node = 82
+*------------------------------------------------------------*
+if Like Count < 20317.5 AND Like Count >= 18993.5 or MISSING
+then 
+ Tree Node Identifier   = 82
+ Number of Observations = 35
+ Predicted: Total_Actions = 23186.942857
+ 
+*------------------------------------------------------------*
+ Node = 83
+*------------------------------------------------------------*
+if Like Count < 21711.5 AND Like Count >= 20317.5
+then 
+ Tree Node Identifier   = 83
+ Number of Observations = 31
+ Predicted: Total_Actions = 24651.322581
+ 
+*------------------------------------------------------------*
+ Node = 84
+*------------------------------------------------------------*
+if Retweet Count < 4904 or MISSING
+AND Like Count < 24117.5 AND Like Count >= 21711.5 or MISSING
+then 
+ Tree Node Identifier   = 84
+ Number of Observations = 32
+ Predicted: Total_Actions = 26633.65625
+ 
+*------------------------------------------------------------*
+ Node = 85
+*------------------------------------------------------------*
+if Retweet Count >= 4904
+AND Like Count < 24117.5 AND Like Count >= 21711.5 or MISSING
+then 
+ Tree Node Identifier   = 85
+ Number of Observations = 15
+ Predicted: Total_Actions = 28146.066667
+ 
+*------------------------------------------------------------*
+ Node = 86
+*------------------------------------------------------------*
+if Retweet Count < 5562 or MISSING
+AND Like Count < 26244 AND Like Count >= 24117.5
+then 
+ Tree Node Identifier   = 86
+ Number of Observations = 32
+ Predicted: Total_Actions = 29660.96875
+ 
+*------------------------------------------------------------*
+ Node = 87
+*------------------------------------------------------------*
+if Retweet Count >= 5562
+AND Like Count < 26244 AND Like Count >= 24117.5
+then 
+ Tree Node Identifier   = 87
+ Number of Observations = 10
+ Predicted: Total_Actions = 31488.5
+ 
+*------------------------------------------------------------*
+ Node = 88
+*------------------------------------------------------------*
+if Retweet Count < 5334.5 or MISSING
+AND Like Count < 29255.5 AND Like Count >= 26244 or MISSING
+then 
+ Tree Node Identifier   = 88
+ Number of Observations = 28
+ Predicted: Total_Actions = 32084.928571
+ 
+*------------------------------------------------------------*
+ Node = 89
+*------------------------------------------------------------*
+if Retweet Count >= 5334.5
+AND Like Count < 29255.5 AND Like Count >= 26244 or MISSING
+then 
+ Tree Node Identifier   = 89
+ Number of Observations = 24
+ Predicted: Total_Actions = 34467.458333
+ 
+*------------------------------------------------------------*
+ Node = 90
+*------------------------------------------------------------*
+if Retweet Count < 6613 or MISSING
+AND Like Count < 32578 AND Like Count >= 29255.5
+then 
+ Tree Node Identifier   = 90
+ Number of Observations = 21
+ Predicted: Total_Actions = 36632.761905
+ 
+*------------------------------------------------------------*
+ Node = 91
+*------------------------------------------------------------*
+if Retweet Count >= 6613
+AND Like Count < 32578 AND Like Count >= 29255.5
+then 
+ Tree Node Identifier   = 91
+ Number of Observations = 16
+ Predicted: Total_Actions = 39058.25
+ 
+*------------------------------------------------------------*
+ Node = 92
+*------------------------------------------------------------*
+if Retweet Count < 7815.5 or MISSING
+AND Like Count < 36968 AND Like Count >= 32578 or MISSING
+then 
+ Tree Node Identifier   = 92
+ Number of Observations = 28
+ Predicted: Total_Actions = 40920.821429
+ 
+*------------------------------------------------------------*
+ Node = 93
+*------------------------------------------------------------*
+if Retweet Count >= 7815.5
+AND Like Count < 36968 AND Like Count >= 32578 or MISSING
+then 
+ Tree Node Identifier   = 93
+ Number of Observations = 20
+ Predicted: Total_Actions = 44662.4
+ 
+*------------------------------------------------------------*
+ Node = 98
+*------------------------------------------------------------*
+if Retweet Count < 10851.5 or MISSING
+AND Like Count < 50758.5 AND Like Count >= 47978.5
+then 
+ Tree Node Identifier   = 98
+ Number of Observations = 6
+ Predicted: Total_Actions = 58360
+ 
+*------------------------------------------------------------*
+ Node = 99
+*------------------------------------------------------------*
+if Retweet Count >= 10851.5
+AND Like Count < 50758.5 AND Like Count >= 47978.5
+then 
+ Tree Node Identifier   = 99
+ Number of Observations = 5
+ Predicted: Total_Actions = 62895
+ 
+*------------------------------------------------------------*
+ Node = 102
+*------------------------------------------------------------*
+if Retweet Count < 9768
+AND Like Count < 61279 AND Like Count >= 54811.5 or MISSING
+then 
+ Tree Node Identifier   = 102
+ Number of Observations = 5
+ Predicted: Total_Actions = 65888.6
+ 
+*------------------------------------------------------------*
+ Node = 103
+*------------------------------------------------------------*
+if Retweet Count >= 9768 or MISSING
+AND Like Count < 61279 AND Like Count >= 54811.5 or MISSING
+then 
+ Tree Node Identifier   = 103
+ Number of Observations = 17
+ Predicted: Total_Actions = 71534.941176
+ 
+*------------------------------------------------------------*
+ Node = 104
+*------------------------------------------------------------*
+if TextCluster_SVD39 >= -0.0165 or MISSING
+AND Like Count < 65336.5 AND Like Count >= 61279
+then 
+ Tree Node Identifier   = 104
+ Number of Observations = 5
+ Predicted: Total_Actions = 76800
+ 
+*------------------------------------------------------------*
+ Node = 105
+*------------------------------------------------------------*
+if TextCluster_SVD39 >= -0.0165 or MISSING
+AND Like Count < 73445.5 AND Like Count >= 65336.5 or MISSING
+then 
+ Tree Node Identifier   = 105
+ Number of Observations = 7
+ Predicted: Total_Actions = 83134
+ 

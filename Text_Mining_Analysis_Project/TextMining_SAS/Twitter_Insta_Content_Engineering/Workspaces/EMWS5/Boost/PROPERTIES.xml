@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8" ?><_ROOT_  Location="CATALOG" Catalog="SASHELP.EMMODL.BOOST.SOURCE" ToolType="MODEL" Iterations="50"
+ CategoricalBins="30" IntervalBins="100" TrainProportion="70" Seed="12345" Shrinkage="0.1"
+ LeafFraction="0.1" SplitSize="." MinCatSize="5" MaxBranch="2" MaxDepth="2" NSurrs="0"
+ Missing="USEINSEARCH" Huber="NO" ReUseVar="1" AssessMeasure="PROFIT" NodeSize="20000"
+ Exhaustive="5000" VarSelection="Y" Performance="DISK" SubSeries="BEST" IterationNum="1"
+ ObsImportance="N" NumSingleImp="5" CreateHStat="N" ForceRun="N" RunAction="Train"
+ Component="Boost" Precision="0" Measure="PROFIT" NumPairImp="0" DataNeeded="Y" RawCreateTime="1904406828.4"
+ CreateTime="06MAY2020:17:53:48" RunId="214daff8-062a-421d-ae2d-dca09204c4a0">
+<VARIABLEPROPERTIES/>
+<FILEPROPERTIES ><![CDATA[
+USERTRAINCODE
+USERSCORECODE
+USERREPORTCODE
+EMNOTES
+]]>
+</FILEPROPERTIES><EMTARGETATTRIBUTES >
+<TOTAL_ACTIONS >
+<DECDATA  Table="EMWS1.Boost_Total_Actions_DD">
+<DATA >
+<OBS  TOTAL_ACTIONS="40"/>
+<OBS  TOTAL_ACTIONS="246465"/>
+<OBS  TOTAL_ACTIONS="13651.015852"/>
+</DATA>
+<METADATA >
+<VARIABLE  NAME="Total_Actions" LABEL="Total Actions" LENGTH="8" FORMAT="" TYPE="N"/>
+</METADATA>
+</DECDATA>
+<DECMETA  Table="EMWS1.Boost_Total_Actions_DM">
+<DATA >
+<OBS  _TYPE_="MATRIX" VARIABLE="" LABEL="" FORMAT="" LEVEL="PROFIT" TYPE="" COST="" USE="N"
+ MIN="." MEAN="." MAX="."/>
+<OBS  _TYPE_="TARGET" VARIABLE="Total_Actions" LABEL="Total Actions" FORMAT="" LEVEL="INTERVAL"
+ TYPE="N" COST="" USE="" MIN="40" MEAN="13651.015852" MAX="246465"/>
+<OBS  _TYPE_="PREDICTED" VARIABLE="P_Total_Actions" LABEL="Predicted: Total_Actions" FORMAT=""
+ LEVEL="" TYPE="N" COST="" USE="" MIN="." MEAN="." MAX="."/>
+<OBS  _TYPE_="RESIDUAL" VARIABLE="R_Total_Actions" LABEL="Residual: Total_Actions" FORMAT=""
+ LEVEL="" TYPE="N" COST="" USE="" MIN="." MEAN="." MAX="."/>
+</DATA>
+<METADATA >
+<VARIABLE  NAME="_TYPE_" LABEL="Type" LENGTH="32" FORMAT="" TYPE="C"/>
+<VARIABLE  NAME="VARIABLE" LABEL="Variable" LENGTH="32" FORMAT="" TYPE="C"/>
+<VARIABLE  NAME="LABEL" LABEL="Label" LENGTH="256" FORMAT="" TYPE="C"/>
+<VARIABLE  NAME="FORMAT" LABEL="Format" LENGTH="32" FORMAT="" TYPE="C"/>
+<VARIABLE  NAME="LEVEL" LABEL="Measurement Level" LENGTH="32" FORMAT="" TYPE="C"/>
+<VARIABLE  NAME="TYPE" LABEL="Type" LENGTH="1" FORMAT="" TYPE="C"/>
+<VARIABLE  NAME="COST" LABEL="Cost" LENGTH="32" FORMAT="" TYPE="C"/>
+<VARIABLE  NAME="USE" LABEL="Use" LENGTH="1" FORMAT="" TYPE="C"/>
+<VARIABLE  NAME="MIN" LABEL="Minimum" LENGTH="8" FORMAT="" TYPE="N"/>
+<VARIABLE  NAME="MEAN" LABEL="Mean" LENGTH="8" FORMAT="" TYPE="N"/>
+<VARIABLE  NAME="MAX" LABEL="Maximum" LENGTH="8" FORMAT="" TYPE="N"/>
+</METADATA>
+</DECMETA>
+</TOTAL_ACTIONS>
+</EMTARGETATTRIBUTES>
+</_ROOT_>

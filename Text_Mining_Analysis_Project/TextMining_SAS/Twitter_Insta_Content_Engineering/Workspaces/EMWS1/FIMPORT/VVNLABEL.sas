@@ -1,0 +1,12 @@
+Character_Count= "Character Count"n;
+Label Character_Count='Character Count';
+drop "Character Count"n;
+Retweet_Count= "Retweet Count"n;
+Label Retweet_Count='Retweet Count';
+drop "Retweet Count"n;
+Like_Count= "Like Count"n;
+Label Like_Count='Like Count';
+drop "Like Count"n;
+Total_Actions= "Total Actions"n;
+Label Total_Actions='Total Actions';
+drop "Total Actions"n;

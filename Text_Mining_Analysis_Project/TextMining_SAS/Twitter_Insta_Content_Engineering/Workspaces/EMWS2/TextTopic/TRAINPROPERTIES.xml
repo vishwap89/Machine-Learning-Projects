@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8" ?><_ROOT_  Location="CATALOG" Catalog="SASHELP.EMTXTEXT.TOPIC.SOURCE" topTermCnt="0" autoTopicCnt="15"
+ autoTopic="N" ForceRun="N" RunAction="Train" Component="TextTopic" initTopics=""
+ tm_topic_node="" tm_topic_dataset="" RawCreateTime="1903226200.7" CreateTime="23APR2020:01:56:41"
+ topics="" augTopics="" RunId="2b7eb497-9d0c-4a77-a073-af514bf26960" RawLastTimeRun="1904399641.3"
+ RawRunTime="18.273000002" LastTimeRun="06MAY2020:15:54:01" RunTime="0 Hr. 0 Min. 18.27 Sec."
+>
+<VARIABLEPROPERTIES/>
+<FILEPROPERTIES ><![CDATA[
+USERTRAINCODE
+USERSCORECODE
+USERREPORTCODE
+INITTOPICS
+TOPIC_CUTOFFS
+]]>
+</FILEPROPERTIES></_ROOT_>

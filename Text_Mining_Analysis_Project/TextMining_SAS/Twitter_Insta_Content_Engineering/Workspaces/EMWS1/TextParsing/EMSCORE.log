@@ -1,0 +1,126 @@
+*------------------------------------------------------------*
+* Score Log
+Date:                April 23, 2020
+Time:                10:27:36
+*------------------------------------------------------------*
+16512  %let EMEXCEPTIONSTRING=;
+16513  *------------------------------------------------------------*;
+16514  * SCORE: TextParsing;
+16515  *------------------------------------------------------------*;
+16516  %let EM_ACTION = SCORE;
+16517  %let syscc = 0;
+16518  %macro main();
+16519    %if %upcase(&EM_ACTION) eq CREATE %then %do;
+16520      filename temp catalog 'sashelp.emtxtext.parse_create.source';
+16521      %include temp;
+16522      %create();
+16523    %end;
+16524    %if %upcase(&EM_ACTION) eq TRAIN %then %do;
+16525      filename temp catalog 'sashelp.emtxtext.parse_train.source';
+16526      %include temp;
+16527      %train();
+16528    %end;
+16529    %if %upcase(&EM_ACTION) eq REPORT %then %do;
+16530      filename temp catalog 'sashelp.emtxtext.parse_report.source';
+16531      %include temp;
+16532      %report();
+16533    %end;
+16534    %if %upcase(&EM_ACTION) eq SCORE %then %do;
+16535      filename temp catalog 'sashelp.emtxtext.parse_score.source';
+16536      %include temp;
+16537      %score();
+16538    %end;
+16539      %if %upcase(&EM_ACTION) eq OPENTABLE1 %then %do;
+16540         filename temp catalog 'sashelp.emtxtext.parse_actions.source';
+16541         %include temp;
+16542         filename temp;
+16543         %openTable1;
+16544     %end;
+16545  %mend main;
+16546  
+16547  %main();
+NOTE: %INCLUDE (level 1) file TEMP is file SASHELP.EMTXTEXT.PARSE_SCORE.SOURCE.
+16548 +%macro tmp_flowscore(import=,export=,role=,filter=);
+16549 +    %if &import ne %then %do;
+16551 +        /* Filter out unwanted languages */
+16552 +        %tm_filter_languages(indata=&import, outdata=&export, languages=%nrbquote(&filter), report_role=&role);
+16554 +    %end;
+16555 +%mend;
+16558 +%macro score();
+16560 +    %em_getname(key=tmconfig, type=data);
+16561 +    %em_getname(key=PRESCORECODE, type=file, extension=sas);
+16563 +    data &EM_USER_TMCONFIG(drop=filterlangs);
+16564 +        set &EM_USER_TMCONFIG;
+16565 +        call symput('filter', filterLangs);
+16566 +    run;
+16568 +    %if %nrbquote(&filter) ne %then %do;
+16570 +          %if not %symexist(em_term_loc) %then %do;
+16571 +        /* When em_term_loc is not specified, the EMWS project folder is assigned as the termloc library*/
+16572 +            %let emtermloc_exists = 0;
+16573 +            %let em_term_loc = %bquote(%sysfunc(pathname(&EM_LIB)));
+16574 +            libname termloc "&em_term_loc";
+16575 +        %end;
+16576 +        %else %do;
+16577 +        /* When em_term_loc is specified, em_term_loc location is assigned as the termloc library*/
+16578 +            %let emtermloc_exists = 1;
+16579 +            libname termloc "&em_term_loc";
+16580 +            %if %sysfunc(libref(termloc)) ne 0 %then %do;
+16581 +                %let  EMEXCEPTIONSTRING = EMTOOL.EMTERMLOC,&em_term_loc;
+16582 +                %goto end_parse_score;
+16583 +            %end;
+16584 +        %end;
+16586 +        filename temp catalog 'sashelp.emtxtext.tm_filter_languages.source';
+16587 +        %include temp;
+16589 +        %tmp_flowscore(import=&em_import_validate,
+16590 +                    export=&em_export_validate,
+16591 +                    role=VALIDATE,
+16592 +                    filter=%nrbquote(&filter));
+16593 +        %tmp_flowscore(import=&em_import_test,
+16594 +                    export=&em_export_test,
+16595 +                    role=TEST,
+16596 +                    filter=%nrbquote(&filter));
+16597 +        %tmp_flowscore(import=&em_import_score,
+16598 +                    export=&em_export_score,
+16599 +                    role=SCORE,
+16600 +                    filter=%nrbquote(&filter));
+16602 +        filename pre "&EM_USER_PRESCORECODE";
+16603 +        data _null_;
+16604 +            file pre;
+16605 +            /*termloc libname statement in the prescore code*/
+16606 +            put 'libname termloc "' "&em_term_loc" '";';
+16607 +            put;
+16608 +            put 'filename temp catalog "sashelp.emtxtext.tm_filter_languages.source";';
+16609 +            put '%include temp;';
+16610 +        run;
+16612 +        filename _tmscore "&EM_FILE_EMPUBLISHSCORECODE";
+16613 +        data _NULL_;
+16614 +            file _tmscore;
+16615 +            put '%tm_filter_languages(indata=&em_score_output, outdata=work._newexport_lang, languages=%nrbquote(';
+16616 +            put "%nrbquote(&filter)));";
+16617 +            put 'data &em_score_output; set work._newexport_lang;';
+16618 +        run;
+16620 +        filename _tmscore;
+16621 +    %end;
+16623 +    %end_parse_score:
+16625 +%mend score;
+NOTE: %INCLUDE (level 1) ending.
+
+NOTE: There were 1 observations read from the data set EMWS1.TEXTPARSING_TMCONFIG.
+NOTE: The data set EMWS1.TEXTPARSING_TMCONFIG has 1 observations and 22 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.05 seconds
+      cpu time            0.00 seconds
+      
+
+16626  *------------------------------------------------------------*;
+16627  * End SCORE: TextParsing;
+16628  *------------------------------------------------------------*;
+16629  
+16630  
+16631  
+16632  
+
+16634  *------------------------------------------------------------*;
+16635  * TextParsing: Computing metadata for TRAIN data;
+16636  *------------------------------------------------------------*;
+

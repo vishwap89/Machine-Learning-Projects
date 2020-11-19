@@ -1,0 +1,29 @@
+ 
+                                                                                                                                                                                                                                                                
+ 
+ 
+Variable Summary
+
+            Measurement    Frequency
+Role           Level         Count
+
+ID           INTERVAL           1   
+ID           NOMINAL            2   
+INPUT        INTERVAL          72   
+INPUT        NOMINAL            1   
+REJECTED     INTERVAL          12   
+SEGMENT      BINARY            15   
+SEGMENT      NOMINAL            1   
+TARGET       INTERVAL           1   
+TEXT         NOMINAL            1   
+ 
+                                                                                                                                                                                                                                                                
+ 
+ 
+Predicted and decision variables
+
+Type            Variable        Label
+
+TARGET       Total_Actions      Total Actions           
+PREDICTED    P_Total_Actions    Predicted: Total_Actions
+RESIDUAL     R_Total_Actions    Residual: Total_Actions 

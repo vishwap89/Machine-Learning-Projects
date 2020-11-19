@@ -1,0 +1,89 @@
+*------------------------------------------------------------*
+User:                yas19006
+Date:                May 06, 2020
+Time:                18:00:09
+*------------------------------------------------------------*
+* Training Output
+*------------------------------------------------------------*
+ 
+ 
+ 
+ 
+Variable Summary
+ 
+          Measurement    Frequency
+Role         Level         Count
+ 
+ID         NOMINAL           1
+INPUT      INTERVAL          3
+INPUT      NOMINAL           1
+TARGET     INTERVAL          1
+TEXT       NOMINAL           1
+ 
+ 
+ 
+ 
+ 
+The CONTENTS Procedure
+ 
+Data Set Name        EMWS5.FIMPORT_DATA            Observations          3849
+Member Type          DATA                          Variables             7
+Engine               V9                            Indexes               0
+Created              05/06/2020 18:00:05           Observation Length    312
+Last Modified        05/06/2020 18:00:05           Deleted Observations  0
+Protection                                         Compressed            NO
+Data Set Type                                      Sorted                NO
+Label
+Data Representation  WINDOWS_64
+Encoding             wlatin1  Western (Windows)
+ 
+ 
+                                         Engine/Host Dependent Information
+ 
+Data Set Page Size          65536
+Number of Data Set Pages    19
+First Data Page             1
+Max Obs per Page            209
+Obs in First Data Page      204
+Number of Data Set Repairs  0
+ExtendObsCounter            YES
+Filename                    P:\DMBI_Project\Twitter_Insta_Content_Engineering\Workspaces\EMWS5\fimport_data.sas7bdat
+Release Created             9.0401M3
+Host Created                X64_8PRO
+ 
+ 
+                 Alphabetic List of Variables and Attributes
+ 
+#    Variable           Type    Len    Format    Informat    Label
+ 
+4    Character_Count    Num       8                          Character Count
+6    Like_Count         Num       8                          Like Count
+2    Message            Char    261    $261.     $261.
+5    Retweet_Count      Num       8                          Retweet Count
+7    Total_Actions      Num       8                          Total Actions
+3    Type               Char      6    $6.       $6.
+1    Username           Char     12    $12.      $12.
+
+
+*------------------------------------------------------------*
+* Score Output
+*------------------------------------------------------------*
+
+
+*------------------------------------------------------------*
+* Report Output
+*------------------------------------------------------------*
+ 
+ 
+ 
+ 
+Exported Attributes for TRAIN Port
+ 
+          Measurement    Frequency
+Role         Level         Count
+ 
+ID         NOMINAL           1
+INPUT      INTERVAL          3
+INPUT      NOMINAL           1
+TARGET     INTERVAL          1
+TEXT       NOMINAL           1

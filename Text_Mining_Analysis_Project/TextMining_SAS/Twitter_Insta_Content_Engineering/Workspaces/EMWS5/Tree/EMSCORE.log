@@ -1,0 +1,2882 @@
+*------------------------------------------------------------*
+* Score Log
+Date:                May 06, 2020
+Time:                18:33:33
+*------------------------------------------------------------*
+16682  %let EMEXCEPTIONSTRING=;
+16683  *------------------------------------------------------------*;
+16684  * SCORE: Tree;
+16685  *------------------------------------------------------------*;
+16686  %let EM_ACTION = SCORE;
+16687  %let syscc = 0;
+16688  %macro main;
+16689  
+16690    %if %upcase(&EM_ACTION) = CREATE %then %do;
+16691      filename temp catalog 'sashelp.emmodl.tree_create.source';
+16692      %include temp;
+16693      filename temp;
+16694  
+16695      %em_tree_create;
+16696    %end;
+16697  
+16698     %else
+16699     %if %upcase(&EM_ACTION) = TRAIN %then %do;
+16700  
+16701         filename temp catalog 'sashelp.emmodl.tree_train.source';
+16702         %include temp;
+16703         filename temp;
+16704         %em_tree_train;
+16705     %end;
+16706  
+16707    %else
+16708    %if %upcase(&EM_ACTION) = SCORE %then %do;
+16709      filename temp catalog 'sashelp.emmodl.tree_score.source';
+16710      %include temp;
+16711      filename temp;
+16712  
+16713      %em_tree_score;
+16714  
+16715    %end;
+16716  
+16717    %else
+16718    %if %upcase(&EM_ACTION) = REPORT %then %do;
+16719  
+16720         filename temp catalog 'sashelp.emmodl.tree_report.source';
+16721         %include temp;
+16722         filename temp;
+16723  
+16724         %em_tree_report;
+16725     %end;
+16726  
+16727    %else
+16728    %if %upcase(&EM_ACTION) = OPENINT %then %do;
+16729  
+16730         filename temp catalog 'sashelp.emmodl.tree_actions.source';
+16731         %include temp;
+16732         filename temp;
+16733         %EM_TREE_OPENTREEVIEWER;
+16734  
+16735     %end;
+16736  
+16737    %else
+16738    %if %upcase(&EM_ACTION) = CLOSEINT %then %do;
+16739  
+16740         filename temp catalog 'sashelp.emmodl.tree_actions.source';
+16741         %include temp;
+16742         filename temp;
+16743         %EM_TREE_CLOSETREEVIEWER;
+16744  
+16745     %end;
+16746  
+16747  
+16748     %doendm:
+16749  %mend main;
+16750  
+16751  %main;
+NOTE: %INCLUDE (level 1) file TEMP is file SASHELP.EMMODL.TREE_SCORE.SOURCE.
+16753 +%macro em_tree_score;
+16755 +   /* determine if multiple targets will be processed */
+16756 +   %let em_tree_multipleTargets=N;
+16757 +   %let em_tree_numTarget=1;
+16758 +   %if "&EM_PROPERTY_USEMULTIPLETARGET" eq "Y" %then %do;
+16759 +      /* determine if there are any ordinal target variables - if so, multiple targets are not supported */
+16760 +      %if &EM_NUM_ORDINAL_TARGET gt 0 %then %do;
+16761 +         %let em_tree_multipleTargets=N;
+16762 +      %end;
+16763 +      %else %do;
+16764 +         /* create macro array of targets  */
+16765 +         data _null_;
+16766 +           set &EM_DATA_VARIABLESET(where=(ROLE='TARGET' AND LEVEL^='ORDINAL')) end=eof;
+16767 +           call symput('em_tree_targetVars'!!strip(put(_N_, BEST.)), strip(Name));
+16768 +           if eof then
+16769 +             call symput('em_tree_numTarget', strip(put(_N_, BEST.)));
+16770 +        run;
+16772 +        %if &em_tree_numTarget gt 1 %then %do;
+16773 +           %let em_tree_multipleTargets=Y;
+16774 +        %end;
+16775 +      %end;
+16776 +   %end;
+16778 +   /* build flow and publish scoring code */
+16779 +   %EM_GETNAME(key=TREEFLOW, type=FILE, extension=sas);
+16780 +   %EM_GETNAME(key=TREEPUBLISH, type=FILE, extension=sas);
+16782 +   filename treeflow "&EM_USER_TREEFLOW";
+16783 +   filename treepub "&EM_USER_TREEPUBLISH";
+16785 +   filename flowref  "&EM_FILE_EMFLOWSCORECODE";
+16786 +   filename pubref   "&EM_FILE_EMPUBLISHSCORECODE";
+16788 +   %em_copyfile(infref=treeflow, outfref=flowref);
+16789 +   %em_copyfile(infref=treepub, outfref=pubref);
+16791 +   filename treeflow;
+16792 +   filename treepub;
+16794 +   /* if priors are used, add code to generate unadjusted residuals in export */
+16795 +   %let useAdjPriors = N;
+16796 +   data _null_;
+16797 +     set &EM_DEC_DECMETA(where=(_TYPE_="DECPRIOR"));
+16798 +     if USE="Y" then call symput('useAdjPriors', 'Y');
+16799 +   run;
+16800 +   %if (("&em_tree_multipleTargets" eq "N") AND ("&useAdjPriors" eq "Y")) %then %do;
+16801 +      filename temp catalog 'sashelp.emutil.em_makeunadjustedresidualvars.source';
+16802 +      %include temp;
+16803 +      filename temp;
+16805 +      %EM_GETNAME(key=adjResidualCode, type=FILE, extension=sas);
+16806 +      filename adjref "&EM_USER_adjResidualCode";
+16807 +      %makeUnadjustedResidualVars(target=%EM_TARGET, decmeta=&EM_DEC_DECMETA, fref=adjref);
+16809 +      %em_copyfile(infref=adjref, outfref=flowref, append=Y);
+16811 +      filename adjref;
+16812 +   %end;
+16814 +   /* LEAF */
+16815 +   %if "&EM_PROPERTY_LEAFID" eq "Y" %then %do;
+16816 +      data _null_;
+16817 +        file flowref mod;
+16818 +        put 'drop _LEAF_;';
+16819 +      run;
+16821 +      data _null_;
+16822 +        file pubref mod;
+16823 +        put 'drop _LEAF_;';
+16824 +      run;
+16826 +   %end;
+16828 +   filename flowref;
+16829 +   filename pubref;
+16831 +   /* em_metachange code */
+16832 +   %if "&EM_PROPERTY_LEAFID" eq "Y" %then %do;
+16833 +     %EM_METACHANGE(name=_NODE_, role=&EM_PROPERTY_NODEROLE, LEVEL=NOMINAL);
+16834 +   %end;
+16836 +   /* variable selection based on importance stat    */
+16837 +   %if "&EM_PROPERTY_VARSELECTION" eq "Y" %then %do;
+16838 +     %EM_GETNAME(key=OUTIMPORT, type=DATA);
+16839 +     %let dsid = %sysfunc(open(&EM_USER_OUTIMPORT(where=(IMPORTANCE<0.05))));
+16840 +     %let varnum = %sysfunc(varnum(&dsid, NAME));
+16841 +     %let obs = %sysfunc(fetch(&dsid));
+16842 +     %do %while(&obs=0);
+16843 +       %let temp = %nrbquote(%sysfunc(getvarc(&dsid, &varnum)));
+16844 +       %let varname = %nrbquote(%sysfunc(tranwrd(&temp,  %str(%"),"")));
+16845 +       %EM_METACHANGE(name=&varname, role=REJECTED);
+16846 +       %let obs = %sysfunc(fetch(&dsid));
+16847 +     %end;
+16848 +     %if &dsid %then %let dsid=%sysfunc(close(&dsid));
+16849 +   %end;
+16851 +   /* set Q_ varaibles to role of ASSESS when in the presense of prior probabilities */
+16852 +   %if %sysfunc(exist(&EM_DEC_DECMETA)) %then %do;
+16853 +    %let tree_pred_vars = ;
+16854 +    %let tree_pred_lvl =;
+16855 +    %let numpred= 0;
+16857 +    data _null_;
+16858 +     set &EM_DEC_DECMETA(where=(_TYPE_="PREDICTED")) end=eof;
+16859 +     call symput('tree_pred_vars'!!strip(put(_N_, BEST.)), strip(VARIABLE));
+16860 +     call symput('tree_pred_lvl'!!strip(put(_N_, BEST.)), strip(LEVEL));
+16861 +     if eof then
+16862 +       call symput('numpred', strip(put(_N_, BEST.)));
+16863 +    run;
+16864 +   %end;
+16866 +   %if &numpred ne 0 %then %do;
+16867 +    %do i=1 %to &numpred;
+16868 +      %let qpred = Q%substr(&&tree_pred_vars&i,2);
+16869 +      %EM_METACHANGE(name=&qpred, role=ASSESS);
+16870 +    %end;
+16871 +   %end;
+16873 +   /* determine if multiple targets will be processed */
+16874 +   %let em_tree_multipleTargets=N;
+16875 +   %let em_tree_numTarget=1;
+16876 +   %if "&EM_PROPERTY_USEMULTIPLETARGET" eq "Y" %then %do;
+16877 +      /* determine if there are any ordinal target variables - if so, multiple targets are not supported */
+16878 +      %if &EM_NUM_ORDINAL_TARGET gt 0 %then %do;
+16879 +         %let em_tree_multipleTargets=N;
+16880 +      %end;
+16881 +      %else %do;
+16882 +        data _null_;
+16883 +          set &EM_DATA_VARIABLESET(where=(ROLE='TARGET' AND LEVEL^='ORDINAL')) end=eof;
+16884 +          if eof then
+16885 +            call symput('em_tree_numTarget', strip(put(_N_, BEST.)));
+16886 +        run;
+16888 +        %if &em_tree_numTarget gt 1 %then %do;
+16889 +           %let em_tree_multipleTargets=Y;
+16890 +        %end;
+16891 +     %end;
+16892 +   %end;
+16894 +   /* need to include this code to do the %em_report for OUTIMPORT here instead of in Report code so _loop data set is created when group processing */
+16895 +   %if "&em_tree_multipleTargets" eq "N" %then %do;
+16897 +      /* variable importance */
+16898 +      %EM_GETNAME(key=OUTIMPORT, type=DATA);
+16899 +      %if %sysfunc(exist(&EM_USER_OUTIMPORT)) eq 1 %then %do;
+16901 +         %let validexist=0;
+16902 +         %if (("&EM_IMPORT_VALIDATE" ne "") AND (%sysfunc(exist(&EM_IMPORT_VALIDATE)) or %sysfunc(exist(&EM_IMPORT_VALIDATE,VIEW)))) %then %do;
+16903 +           %let validexist=1;
+16904 +         %end;
+16906 +         /* determine if vars exists - properties could indicate they are they but freeze=Y would mean the node wasn't retrained */
+16907 +         /* and the columns may not be generated                                                                                 */
+16908 +         %let em_tree_cvexists=;
+16909 +         %let em_tree_surrexists=.;
+16910 +         data _null_;
+16911 +            set &EM_USER_OUTIMPORT (obs=2) end=eof;
+16912 +            if eof then do ;
+16913 +               call symput("em_tree_cvexists" , strip(put(cvimportance,best.))) ;
+16914 +               call symput("em_tree_surrexists", strip(put(nsurrogates, best.)));
+16915 +            end;
+16916 +         run;
+16918 +         data &EM_USER_OUTIMPORT;
+16919 +            set &EM_USER_OUTIMPORT;
+16921 +            /* format columns based on Precison value specified */
+16922 +            format importance 15.&EM_PROPERTY_PRECISION
+16923 +                 %if &validexist %then %do;
+16924 +                   vimportance ratio 15.&EM_PROPERTY_PRECISION
+16925 +                 %end;
+16926 +                 %if "&EM_TREE_CVEXISTS" ne "." %then %do;
+16927 +                   cvimportance vimportance ratio 15.&EM_PROPERTY_PRECISION
+16928 +                 %end;
+16929 +            ;
+16930 +            label  NAME       = "%sysfunc(sasmsg(sashelp.dmine, meta_name_vlabel, noquote))"
+16931 +                 LABEL        = "%sysfunc(sasmsg(sashelp.dmine, meta_label_vlabel, noquote))"
+16932 +                 NRULES       = "%sysfunc(sasmsg(sashelp.dmine, rpt_nrules_vlabel, noquote))"
+16933 +                 IMPORTANCE   = "%sysfunc(sasmsg(sashelp.dmine, rpt_importance_vlabel, noquote))"
+16934 +                 %if "&em_tree_surrexists" ne "" %then %do;
+16935 +                   NSURROGATES  = "%sysfunc(sasmsg(sashelp.dmine, rpt_nsurrogates_vlabel, noquote))"
+16936 +                 %end;
+16937 +                 %if &validexist %then %do;
+16938 +                   VIMPORTANCE = "%sysfunc(sasmsg(sashelp.dmine, rpt_vimportance_vlabel, noquote))"
+16939 +                   RATIO       = "%sysfunc(sasmsg(sashelp.dmine, rpt_ratio_vlabel, noquote))"
+16940 +                 %end;
+16941 +                 %if "&EM_TREE_CVEXISTS" ne "" %then %do;
+16942 +                   VIMPORTANCE = "%sysfunc(sasmsg(sashelp.dmine, rpt_vimportance_vlabel, noquote))"
+16943 +                   CVIMPORTANCE =  "%sysfunc(sasmsg(sashelp.dmine, rpt_cvimport_vlabel, noquote))"
+16944 +                   CVRULES= "%sysfunc(sasmsg(sashelp.dmine, rpt_cvrules_vlabel, noquote))"
+16945 +                   RATIO = "%sysfunc(sasmsg(sashelp.dmine, rpt_ratio_vlabel, noquote))"
+16946 +                 %end;
+16947 +            ;
+16948 +         run;
+16950 +         %EM_REPORT(key=OUTIMPORT, viewtype=DATA, block=MODEL, description=IMPORTANCE, autodisplay=N);
+16951 +      %end;
+16952 +   %end;
+16954 +   %doendm:
+16955 +%mend em_tree_score;
+NOTE: %INCLUDE (level 1) ending.
+NOTE: Fileref TEMP has been deassigned.
+
+NOTE: The file FLOWREF is:
+      Filename=P:\DMBI_Project\Twitter_Insta_Content_Engineering\Workspaces\EMWS5\Tree\EMFLOWSCORE.sas,
+      RECFM=V,LRECL=20000,File Size (bytes)=0,
+      Last Modified=06May2020:18:33:33,
+      Create Time=06May2020:18:33:33
+
+NOTE: 463 records were written to the file FLOWREF.
+      The minimum record length was 1.
+      The maximum record length was 65.
+NOTE: DATA statement used (Total process time):
+      real time           0.03 seconds
+      cpu time            0.00 seconds
+      
+
+
+NOTE: The file PUBREF is:
+      Filename=P:\DMBI_Project\Twitter_Insta_Content_Engineering\Workspaces\EMWS5\Tree\EMPUBLISHSCORE.sas,
+      RECFM=V,LRECL=20000,File Size (bytes)=0,
+      Last Modified=06May2020:18:33:33,
+      Create Time=06May2020:18:33:33
+
+NOTE: 458 records were written to the file PUBREF.
+      The minimum record length was 1.
+      The maximum record length was 65.
+NOTE: DATA statement used (Total process time):
+      real time           0.03 seconds
+      cpu time            0.01 seconds
+      
+
+NOTE: Fileref TREEFLOW has been deassigned.
+NOTE: Fileref TREEPUB has been deassigned.
+
+NOTE: There were 0 observations read from the data set EMWS5.TREE_TOTAL_ACTIONS_DM.
+      WHERE _TYPE_='DECPRIOR';
+NOTE: DATA statement used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+
+NOTE: The file FLOWREF is:
+      Filename=P:\DMBI_Project\Twitter_Insta_Content_Engineering\Workspaces\EMWS5\Tree\EMFLOWSCORE.sas,
+      RECFM=V,LRECL=32767,File Size (bytes)=17807,
+      Last Modified=06May2020:18:33:33,
+      Create Time=06May2020:18:33:33
+
+NOTE: 1 record was written to the file FLOWREF.
+      The minimum record length was 12.
+      The maximum record length was 12.
+NOTE: DATA statement used (Total process time):
+      real time           0.03 seconds
+      cpu time            0.00 seconds
+      
+
+
+NOTE: The file PUBREF is:
+      Filename=P:\DMBI_Project\Twitter_Insta_Content_Engineering\Workspaces\EMWS5\Tree\EMPUBLISHSCORE.sas,
+      RECFM=V,LRECL=32767,File Size (bytes)=17599,
+      Last Modified=06May2020:18:33:33,
+      Create Time=06May2020:18:33:33
+
+NOTE: 1 record was written to the file PUBREF.
+      The minimum record length was 12.
+      The maximum record length was 12.
+NOTE: DATA statement used (Total process time):
+      real time           0.06 seconds
+      cpu time            0.00 seconds
+      
+
+NOTE: Fileref FLOWREF has been deassigned.
+NOTE: Fileref PUBREF has been deassigned.
+
+NOTE: The data set WORK.EM_METACHANGE has 1 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+      
+
+
+NOTE: There were 1 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 2 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+      
+
+
+NOTE: There were 2 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 3 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.00 seconds
+      
+
+
+NOTE: There were 3 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 4 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+      
+
+
+NOTE: There were 4 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 5 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+      
+
+
+NOTE: There were 5 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 6 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+      
+
+
+NOTE: There were 6 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 7 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+      
+
+
+NOTE: There were 7 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 8 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.01 seconds
+      
+
+
+NOTE: There were 8 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 9 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.00 seconds
+      
+
+
+NOTE: There were 9 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 10 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+      
+
+
+NOTE: There were 10 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 11 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+      
+
+
+NOTE: There were 11 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 12 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.00 seconds
+      
+
+
+NOTE: There were 12 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 13 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.01 seconds
+      
+
+
+NOTE: There were 13 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 14 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+      
+
+
+NOTE: There were 14 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 15 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.00 seconds
+      
+
+
+NOTE: There were 15 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 16 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+      
+
+
+NOTE: There were 16 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 17 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+      
+
+
+NOTE: There were 17 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 18 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+      
+
+
+NOTE: There were 18 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 19 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.01 seconds
+      
+
+
+NOTE: There were 19 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 20 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+      
+
+
+NOTE: There were 20 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 21 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.03 seconds
+      
+
+
+NOTE: There were 21 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 22 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+      
+
+
+NOTE: There were 22 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 23 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+      
+
+
+NOTE: There were 23 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 24 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+      
+
+
+NOTE: There were 24 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 25 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+      
+
+
+NOTE: There were 25 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 26 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+      
+
+
+NOTE: There were 26 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 27 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+      
+
+
+NOTE: There were 27 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 28 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+      
+
+
+NOTE: There were 28 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 29 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.01 seconds
+      
+
+
+NOTE: There were 29 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 30 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+      
+
+
+NOTE: There were 30 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 31 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+      
+
+
+NOTE: There were 31 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 32 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+      
+
+
+NOTE: There were 32 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 33 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+      
+
+
+NOTE: There were 33 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 34 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+      
+
+
+NOTE: There were 34 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 35 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+      
+
+
+NOTE: There were 35 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 36 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+      
+
+
+NOTE: There were 36 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 37 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.01 seconds
+      
+
+
+NOTE: There were 37 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 38 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+      
+
+
+NOTE: There were 38 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 39 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.04 seconds
+      cpu time            0.03 seconds
+      
+
+
+NOTE: There were 39 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 40 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+      
+
+
+NOTE: There were 40 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 41 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.00 seconds
+      
+
+
+NOTE: There were 41 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 42 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+      
+
+
+NOTE: There were 42 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 43 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+      
+
+
+NOTE: There were 43 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 44 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+      
+
+
+NOTE: There were 44 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 45 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+      
+
+
+NOTE: There were 45 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 46 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+      
+
+
+NOTE: There were 46 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 47 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.01 seconds
+      
+
+
+NOTE: There were 47 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 48 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+      
+
+
+NOTE: There were 48 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 49 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+      
+
+
+NOTE: There were 49 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 50 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+      
+
+
+NOTE: There were 50 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 51 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+      
+
+
+NOTE: There were 51 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 52 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+      
+
+
+NOTE: There were 52 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 53 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.01 seconds
+      
+
+
+NOTE: There were 53 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 54 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+      
+
+
+NOTE: There were 54 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 55 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+      
+
+
+NOTE: There were 55 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 56 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+      
+
+
+NOTE: There were 56 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 57 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.01 seconds
+      
+
+
+NOTE: There were 57 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 58 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+      
+
+
+NOTE: There were 58 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 59 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.00 seconds
+      
+
+
+NOTE: There were 59 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 60 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+      
+
+
+NOTE: There were 60 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 61 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.01 seconds
+      
+
+
+NOTE: There were 61 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 62 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+      
+
+
+NOTE: There were 62 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 63 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+      
+
+
+NOTE: There were 63 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 64 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+      
+
+
+NOTE: There were 64 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 65 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.00 seconds
+      
+
+
+NOTE: There were 65 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 66 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+      
+
+
+NOTE: There were 66 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 67 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.01 seconds
+      
+
+
+NOTE: There were 67 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 68 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+      
+
+
+NOTE: There were 68 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 69 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+      
+
+
+NOTE: There were 69 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 70 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+      
+
+
+NOTE: There were 70 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 71 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+      
+
+
+NOTE: There were 71 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 72 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+      
+
+
+NOTE: There were 72 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 73 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+      
+
+
+NOTE: There were 1 observations read from the data set EMWS5.TREE_TOTAL_ACTIONS_DM.
+      WHERE _TYPE_='PREDICTED';
+NOTE: DATA statement used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+
+NOTE: There were 73 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 74 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+      
+
+
+NOTE: Variable cvimportance is uninitialized.
+NOTE: Variable nsurrogates is uninitialized.
+NOTE: There were 2 observations read from the data set EMWS5.TREE_OUTIMPORT.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+      
+
+
+NOTE: Variable NSURROGATES is uninitialized.
+NOTE: Variable CVIMPORTANCE is uninitialized.
+NOTE: Variable CVRULES is uninitialized.
+NOTE: There were 73 observations read from the data set EMWS5.TREE_OUTIMPORT.
+NOTE: The data set EMWS5.TREE_OUTIMPORT has 73 observations and 6 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.11 seconds
+      cpu time            0.03 seconds
+      
+
+
+NOTE: The data set WORK.EM_USER_REPORT has 132 observations and 4 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.04 seconds
+      cpu time            0.03 seconds
+      
+
+16956  
+16957  *------------------------------------------------------------*;
+16958  * End SCORE: Tree;
+16959  *------------------------------------------------------------*;
+
+16960  proc sort data=WORK.EM_METACHANGE;
+16961  by key uname;
+16962  run;
+
+NOTE: There were 74 observations read from the data set WORK.EM_METACHANGE.
+NOTE: The data set WORK.EM_METACHANGE has 74 observations and 9 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+      
+
+16963  filename x "P:\DMBI_Project\Twitter_Insta_Content_Engineering\Workspaces\EMWS5\Tree\CDELTA_TRAIN.sas";
+16964  data _null_;
+16965  file x;
+16966  put 'if upcase(NAME) = "CHARACTER_COUNT" then do;';
+16967  put 'ROLE = "REJECTED";';
+16968  put 'end;';
+16969  put 'else ';
+16970  put 'if upcase(NAME) = "Q_TOTAL_ACTIONS" then do;';
+16971  put 'ROLE = "ASSESS";';
+16972  put 'end;';
+16973  put 'else ';
+16974  put 'if upcase(NAME) = "RETWEET_COUNT" then do;';
+16975  put 'ROLE = "REJECTED";';
+16976  put 'end;';
+16977  put 'else ';
+16978  put 'if upcase(NAME) = "TEXTCLUSTER_SVD1" then do;';
+16979  put 'ROLE = "REJECTED";';
+16980  put 'end;';
+16981  put 'else ';
+16982  put 'if upcase(NAME) = "TEXTCLUSTER_SVD10" then do;';
+16983  put 'ROLE = "REJECTED";';
+16984  put 'end;';
+16985  put 'else ';
+16986  put 'if upcase(NAME) = "TEXTCLUSTER_SVD11" then do;';
+16987  put 'ROLE = "REJECTED";';
+16988  put 'end;';
+16989  put 'else ';
+16990  put 'if upcase(NAME) = "TEXTCLUSTER_SVD12" then do;';
+16991  put 'ROLE = "REJECTED";';
+16992  put 'end;';
+16993  put 'else ';
+16994  put 'if upcase(NAME) = "TEXTCLUSTER_SVD13" then do;';
+16995  put 'ROLE = "REJECTED";';
+16996  put 'end;';
+16997  put 'else ';
+16998  put 'if upcase(NAME) = "TEXTCLUSTER_SVD14" then do;';
+16999  put 'ROLE = "REJECTED";';
+17000  put 'end;';
+17001  put 'else ';
+17002  put 'if upcase(NAME) = "TEXTCLUSTER_SVD15" then do;';
+17003  put 'ROLE = "REJECTED";';
+17004  put 'end;';
+17005  put 'else ';
+17006  put 'if upcase(NAME) = "TEXTCLUSTER_SVD16" then do;';
+17007  put 'ROLE = "REJECTED";';
+17008  put 'end;';
+17009  put 'else ';
+17010  put 'if upcase(NAME) = "TEXTCLUSTER_SVD17" then do;';
+17011  put 'ROLE = "REJECTED";';
+17012  put 'end;';
+17013  put 'else ';
+17014  put 'if upcase(NAME) = "TEXTCLUSTER_SVD18" then do;';
+17015  put 'ROLE = "REJECTED";';
+17016  put 'end;';
+17017  put 'else ';
+17018  put 'if upcase(NAME) = "TEXTCLUSTER_SVD19" then do;';
+17019  put 'ROLE = "REJECTED";';
+17020  put 'end;';
+17021  put 'else ';
+17022  put 'if upcase(NAME) = "TEXTCLUSTER_SVD2" then do;';
+17023  put 'ROLE = "REJECTED";';
+17024  put 'end;';
+17025  put 'else ';
+17026  put 'if upcase(NAME) = "TEXTCLUSTER_SVD20" then do;';
+17027  put 'ROLE = "REJECTED";';
+17028  put 'end;';
+17029  put 'else ';
+17030  put 'if upcase(NAME) = "TEXTCLUSTER_SVD21" then do;';
+17031  put 'ROLE = "REJECTED";';
+17032  put 'end;';
+17033  put 'else ';
+17034  put 'if upcase(NAME) = "TEXTCLUSTER_SVD22" then do;';
+17035  put 'ROLE = "REJECTED";';
+17036  put 'end;';
+17037  put 'else ';
+17038  put 'if upcase(NAME) = "TEXTCLUSTER_SVD23" then do;';
+17039  put 'ROLE = "REJECTED";';
+17040  put 'end;';
+17041  put 'else ';
+17042  put 'if upcase(NAME) = "TEXTCLUSTER_SVD24" then do;';
+17043  put 'ROLE = "REJECTED";';
+17044  put 'end;';
+17045  put 'else ';
+17046  put 'if upcase(NAME) = "TEXTCLUSTER_SVD25" then do;';
+17047  put 'ROLE = "REJECTED";';
+17048  put 'end;';
+17049  put 'else ';
+17050  put 'if upcase(NAME) = "TEXTCLUSTER_SVD26" then do;';
+17051  put 'ROLE = "REJECTED";';
+17052  put 'end;';
+17053  put 'else ';
+17054  put 'if upcase(NAME) = "TEXTCLUSTER_SVD27" then do;';
+17055  put 'ROLE = "REJECTED";';
+17056  put 'end;';
+17057  put 'else ';
+17058  put 'if upcase(NAME) = "TEXTCLUSTER_SVD28" then do;';
+17059  put 'ROLE = "REJECTED";';
+17060  put 'end;';
+17061  put 'else ';
+17062  put 'if upcase(NAME) = "TEXTCLUSTER_SVD29" then do;';
+17063  put 'ROLE = "REJECTED";';
+17064  put 'end;';
+17065  put 'else ';
+17066  put 'if upcase(NAME) = "TEXTCLUSTER_SVD3" then do;';
+17067  put 'ROLE = "REJECTED";';
+17068  put 'end;';
+17069  put 'else ';
+17070  put 'if upcase(NAME) = "TEXTCLUSTER_SVD30" then do;';
+17071  put 'ROLE = "REJECTED";';
+17072  put 'end;';
+17073  put 'else ';
+17074  put 'if upcase(NAME) = "TEXTCLUSTER_SVD31" then do;';
+17075  put 'ROLE = "REJECTED";';
+17076  put 'end;';
+17077  put 'else ';
+17078  put 'if upcase(NAME) = "TEXTCLUSTER_SVD32" then do;';
+17079  put 'ROLE = "REJECTED";';
+17080  put 'end;';
+17081  put 'else ';
+17082  put 'if upcase(NAME) = "TEXTCLUSTER_SVD33" then do;';
+17083  put 'ROLE = "REJECTED";';
+17084  put 'end;';
+17085  put 'else ';
+17086  put 'if upcase(NAME) = "TEXTCLUSTER_SVD34" then do;';
+17087  put 'ROLE = "REJECTED";';
+17088  put 'end;';
+17089  put 'else ';
+17090  put 'if upcase(NAME) = "TEXTCLUSTER_SVD35" then do;';
+17091  put 'ROLE = "REJECTED";';
+17092  put 'end;';
+17093  put 'else ';
+17094  put 'if upcase(NAME) = "TEXTCLUSTER_SVD36" then do;';
+17095  put 'ROLE = "REJECTED";';
+17096  put 'end;';
+17097  put 'else ';
+17098  put 'if upcase(NAME) = "TEXTCLUSTER_SVD37" then do;';
+17099  put 'ROLE = "REJECTED";';
+17100  put 'end;';
+17101  put 'else ';
+17102  put 'if upcase(NAME) = "TEXTCLUSTER_SVD38" then do;';
+17103  put 'ROLE = "REJECTED";';
+17104  put 'end;';
+17105  put 'else ';
+17106  put 'if upcase(NAME) = "TEXTCLUSTER_SVD39" then do;';
+17107  put 'ROLE = "REJECTED";';
+17108  put 'end;';
+17109  put 'else ';
+17110  put 'if upcase(NAME) = "TEXTCLUSTER_SVD4" then do;';
+17111  put 'ROLE = "REJECTED";';
+17112  put 'end;';
+17113  put 'else ';
+17114  put 'if upcase(NAME) = "TEXTCLUSTER_SVD40" then do;';
+17115  put 'ROLE = "REJECTED";';
+17116  put 'end;';
+17117  put 'else ';
+17118  put 'if upcase(NAME) = "TEXTCLUSTER_SVD41" then do;';
+17119  put 'ROLE = "REJECTED";';
+17120  put 'end;';
+17121  put 'else ';
+17122  put 'if upcase(NAME) = "TEXTCLUSTER_SVD42" then do;';
+17123  put 'ROLE = "REJECTED";';
+17124  put 'end;';
+17125  put 'else ';
+17126  put 'if upcase(NAME) = "TEXTCLUSTER_SVD43" then do;';
+17127  put 'ROLE = "REJECTED";';
+17128  put 'end;';
+17129  put 'else ';
+17130  put 'if upcase(NAME) = "TEXTCLUSTER_SVD44" then do;';
+17131  put 'ROLE = "REJECTED";';
+17132  put 'end;';
+17133  put 'else ';
+17134  put 'if upcase(NAME) = "TEXTCLUSTER_SVD45" then do;';
+17135  put 'ROLE = "REJECTED";';
+17136  put 'end;';
+17137  put 'else ';
+17138  put 'if upcase(NAME) = "TEXTCLUSTER_SVD46" then do;';
+17139  put 'ROLE = "REJECTED";';
+17140  put 'end;';
+17141  put 'else ';
+17142  put 'if upcase(NAME) = "TEXTCLUSTER_SVD47" then do;';
+17143  put 'ROLE = "REJECTED";';
+17144  put 'end;';
+17145  put 'else ';
+17146  put 'if upcase(NAME) = "TEXTCLUSTER_SVD48" then do;';
+17147  put 'ROLE = "REJECTED";';
+17148  put 'end;';
+17149  put 'else ';
+17150  put 'if upcase(NAME) = "TEXTCLUSTER_SVD49" then do;';
+17151  put 'ROLE = "REJECTED";';
+17152  put 'end;';
+17153  put 'else ';
+17154  put 'if upcase(NAME) = "TEXTCLUSTER_SVD5" then do;';
+17155  put 'ROLE = "REJECTED";';
+17156  put 'end;';
+17157  put 'else ';
+17158  put 'if upcase(NAME) = "TEXTCLUSTER_SVD50" then do;';
+17159  put 'ROLE = "REJECTED";';
+17160  put 'end;';
+17161  put 'else ';
+17162  put 'if upcase(NAME) = "TEXTCLUSTER_SVD51" then do;';
+17163  put 'ROLE = "REJECTED";';
+17164  put 'end;';
+17165  put 'else ';
+17166  put 'if upcase(NAME) = "TEXTCLUSTER_SVD52" then do;';
+17167  put 'ROLE = "REJECTED";';
+17168  put 'end;';
+17169  put 'else ';
+17170  put 'if upcase(NAME) = "TEXTCLUSTER_SVD53" then do;';
+17171  put 'ROLE = "REJECTED";';
+17172  put 'end;';
+17173  put 'else ';
+17174  put 'if upcase(NAME) = "TEXTCLUSTER_SVD54" then do;';
+17175  put 'ROLE = "REJECTED";';
+17176  put 'end;';
+17177  put 'else ';
+17178  put 'if upcase(NAME) = "TEXTCLUSTER_SVD6" then do;';
+17179  put 'ROLE = "REJECTED";';
+17180  put 'end;';
+17181  put 'else ';
+17182  put 'if upcase(NAME) = "TEXTCLUSTER_SVD7" then do;';
+17183  put 'ROLE = "REJECTED";';
+17184  put 'end;';
+17185  put 'else ';
+17186  put 'if upcase(NAME) = "TEXTCLUSTER_SVD8" then do;';
+17187  put 'ROLE = "REJECTED";';
+17188  put 'end;';
+17189  put 'else ';
+17190  put 'if upcase(NAME) = "TEXTCLUSTER_SVD9" then do;';
+17191  put 'ROLE = "REJECTED";';
+17192  put 'end;';
+17193  put 'else ';
+17194  put 'if upcase(NAME) = "TEXTTOPIC_RAW1" then do;';
+17195  put 'ROLE = "REJECTED";';
+17196  put 'end;';
+17197  put 'else ';
+17198  put 'if upcase(NAME) = "TEXTTOPIC_RAW10" then do;';
+17199  put 'ROLE = "REJECTED";';
+17200  put 'end;';
+17201  put 'else ';
+17202  put 'if upcase(NAME) = "TEXTTOPIC_RAW11" then do;';
+17203  put 'ROLE = "REJECTED";';
+17204  put 'end;';
+17205  put 'else ';
+17206  put 'if upcase(NAME) = "TEXTTOPIC_RAW12" then do;';
+17207  put 'ROLE = "REJECTED";';
+17208  put 'end;';
+17209  put 'else ';
+17210  put 'if upcase(NAME) = "TEXTTOPIC_RAW13" then do;';
+17211  put 'ROLE = "REJECTED";';
+17212  put 'end;';
+17213  put 'else ';
+17214  put 'if upcase(NAME) = "TEXTTOPIC_RAW14" then do;';
+17215  put 'ROLE = "REJECTED";';
+17216  put 'end;';
+17217  put 'else ';
+17218  put 'if upcase(NAME) = "TEXTTOPIC_RAW15" then do;';
+17219  put 'ROLE = "REJECTED";';
+17220  put 'end;';
+17221  put 'else ';
+17222  put 'if upcase(NAME) = "TEXTTOPIC_RAW2" then do;';
+17223  put 'ROLE = "REJECTED";';
+17224  put 'end;';
+17225  put 'else ';
+17226  put 'if upcase(NAME) = "TEXTTOPIC_RAW3" then do;';
+17227  put 'ROLE = "REJECTED";';
+17228  put 'end;';
+17229  put 'else ';
+17230  put 'if upcase(NAME) = "TEXTTOPIC_RAW4" then do;';
+17231  put 'ROLE = "REJECTED";';
+17232  put 'end;';
+17233  put 'else ';
+17234  put 'if upcase(NAME) = "TEXTTOPIC_RAW5" then do;';
+17235  put 'ROLE = "REJECTED";';
+17236  put 'end;';
+17237  put 'else ';
+17238  put 'if upcase(NAME) = "TEXTTOPIC_RAW6" then do;';
+17239  put 'ROLE = "REJECTED";';
+17240  put 'end;';
+17241  put 'else ';
+17242  put 'if upcase(NAME) = "TEXTTOPIC_RAW7" then do;';
+17243  put 'ROLE = "REJECTED";';
+17244  put 'end;';
+17245  put 'else ';
+17246  put 'if upcase(NAME) = "TEXTTOPIC_RAW8" then do;';
+17247  put 'ROLE = "REJECTED";';
+17248  put 'end;';
+17249  put 'else ';
+17250  put 'if upcase(NAME) = "TEXTTOPIC_RAW9" then do;';
+17251  put 'ROLE = "REJECTED";';
+17252  put 'end;';
+17253  put 'else ';
+17254  put 'if upcase(NAME) = "TYPE" then do;';
+17255  put 'ROLE = "REJECTED";';
+17256  put 'end;';
+17257  put 'else ';
+17258  put 'if upcase(NAME) = "_NODE_" then do;';
+17259  put 'ROLE = "SEGMENT";';
+17260  put 'LEVEL = "NOMINAL";';
+17261  put 'end;';
+17262  run;
+
+NOTE: The file X is:
+      Filename=P:\DMBI_Project\Twitter_Insta_Content_Engineering\Workspaces\EMWS5\Tree\CDELTA_TRAIN.sas,
+      RECFM=V,LRECL=32767,File Size (bytes)=0,
+      Last Modified=06May2020:18:33:35,
+      Create Time=06May2020:18:03:06
+
+NOTE: 296 records were written to the file X.
+      The minimum record length was 4.
+      The maximum record length was 46.
+NOTE: DATA statement used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.00 seconds
+      
+
+17263  filename x;
+NOTE: Fileref X has been deassigned.
+
+17264  filename emflow "P:\DMBI_Project\Twitter_Insta_Content_Engineering\Workspaces\EMWS5\Tree\EMFLOWSCORE.sas";
+17265  *------------------------------------------------------------*;
+17266  * Tree: Scoring DATA data;
+17267  *------------------------------------------------------------*;
+17268  data EMWS5.Tree_TRAIN
+17269  / view=EMWS5.Tree_TRAIN
+17270  ;
+17271  set EMWS5.TextTopic_TRAIN
+17272  ;
+17273  %inc emflow;
+NOTE: %INCLUDE (level 1) file EMFLOW is file P:\DMBI_Project\Twitter_Insta_Content_Engineering\Workspaces\EMWS5\Tree\EMFLOWSCORE.sas.
+17274 +****************************************************************;
+17275 +******             DECISION TREE SCORING CODE             ******;
+17276 +****************************************************************;
+17277 +
+17278 +******         LENGTHS OF NEW CHARACTER VARIABLES         ******;
+17279 +LENGTH _WARN_  $    4;
+17280 +
+17281 +******              LABELS FOR NEW VARIABLES              ******;
+17282 +label _NODE_ = 'Node' ;
+17283 +label _LEAF_ = 'Leaf' ;
+17284 +label P_Total_Actions = 'Predicted: Total_Actions' ;
+17285 +label V_Total_Actions = 'Validated: Total_Actions' ;
+17286 +label R_Total_Actions = 'Residual: Total_Actions' ;
+17287 +label _WARN_ = 'Warnings' ;
+17288 +
+17289 +
+17290 +
+17291 +******             ASSIGN OBSERVATION TO NODE             ******;
+17292 +IF  NOT MISSING(Like_Count ) AND
+17293 +                 26244 <= Like_Count  THEN DO;
+17294 +  IF  NOT MISSING(Like_Count ) AND
+17295 +                   61279 <= Like_Count  THEN DO;
+17296 +    IF  NOT MISSING(Like_Count ) AND
+17297 +                   94861.5 <= Like_Count  THEN DO;
+17298 +      _NODE_  =                   15;
+17299 +      _LEAF_  =                   49;
+17300 +      P_Total_Actions  =     158441.857142857;
+17301 +      V_Total_Actions  =               176878;
+17302 +      END;
+17303 +    ELSE DO;
+17304 +      IF  NOT MISSING(Like_Count ) AND
+17305 +                     73445.5 <= Like_Count  THEN DO;
+17306 +        _NODE_  =                   29;
+17307 +        _LEAF_  =                   48;
+17308 +        P_Total_Actions  =     102068.222222222;
+17309 +        V_Total_Actions  =               100576;
+17310 +        END;
+17311 +      ELSE DO;
+17312 +        IF  NOT MISSING(TextCluster_SVD39 ) AND
+17313 +          TextCluster_SVD39  <    -0.01650754330562 THEN DO;
+17314 +          _NODE_  =                   54;
+17315 +          _LEAF_  =                   45;
+17316 +          P_Total_Actions  =     86650.8571428571;
+17317 +          V_Total_Actions  =              80876.5;
+17318 +          END;
+17319 +        ELSE DO;
+17320 +          IF  NOT MISSING(Like_Count ) AND
+17321 +            Like_Count  <              65336.5 THEN DO;
+17322 +            _NODE_  =                  104;
+17323 +            _LEAF_  =                   46;
+17324 +            P_Total_Actions  =                76800;
+17325 +            V_Total_Actions  =                76985;
+17326 +            END;
+17327 +          ELSE DO;
+17328 +            _NODE_  =                  105;
+17329 +            _LEAF_  =                   47;
+17330 +            P_Total_Actions  =                83134;
+17331 +            V_Total_Actions  =                78421;
+17332 +            END;
+17333 +          END;
+17334 +        END;
+17335 +      END;
+17336 +    END;
+17337 +  ELSE DO;
+17338 +    IF  NOT MISSING(Like_Count ) AND
+17339 +                   42625.5 <= Like_Count  THEN DO;
+17340 +      IF  NOT MISSING(Like_Count ) AND
+17341 +                     50758.5 <= Like_Count  THEN DO;
+17342 +        IF  NOT MISSING(Like_Count ) AND
+17343 +          Like_Count  <              54811.5 THEN DO;
+17344 +          _NODE_  =                   52;
+17345 +          _LEAF_  =                   42;
+17346 +          P_Total_Actions  =     64541.7272727272;
+17347 +          V_Total_Actions  =     65511.7142857142;
+17348 +          END;
+17349 +        ELSE DO;
+17350 +          IF  NOT MISSING(Retweet_Count ) AND
+17351 +            Retweet_Count  <                 9768 THEN DO;
+17352 +            _NODE_  =                  102;
+17353 +            _LEAF_  =                   43;
+17354 +            P_Total_Actions  =              65888.6;
+17355 +            V_Total_Actions  =              68721.5;
+17356 +            END;
+17357 +          ELSE DO;
+17358 +            _NODE_  =                  103;
+17359 +            _LEAF_  =                   44;
+17360 +            P_Total_Actions  =     71534.9411764706;
+17361 +            V_Total_Actions  =     73987.2857142857;
+17362 +            END;
+17363 +          END;
+17364 +        END;
+17365 +      ELSE DO;
+17366 +        IF  NOT MISSING(Like_Count ) AND
+17367 +                       47978.5 <= Like_Count  THEN DO;
+17368 +          IF  NOT MISSING(Retweet_Count ) AND
+17369 +                         10851.5 <= Retweet_Count  THEN DO;
+17370 +            _NODE_  =                   99;
+17371 +            _LEAF_  =                   41;
+17372 +            P_Total_Actions  =                62895;
+17373 +            V_Total_Actions  =                66275;
+17374 +            END;
+17375 +          ELSE DO;
+17376 +            _NODE_  =                   98;
+17377 +            _LEAF_  =                   40;
+17378 +            P_Total_Actions  =                58360;
+17379 +            V_Total_Actions  =                58556;
+17380 +            END;
+17381 +          END;
+17382 +        ELSE DO;
+17383 +          _NODE_  =                   50;
+17384 +          _LEAF_  =                   39;
+17385 +          P_Total_Actions  =     54199.6551724138;
+17386 +          V_Total_Actions  =     55754.8333333333;
+17387 +          END;
+17388 +        END;
+17389 +      END;
+17390 +    ELSE DO;
+17391 +      IF  NOT MISSING(Like_Count ) AND
+17392 +                       32578 <= Like_Count  THEN DO;
+17393 +        IF  NOT MISSING(Like_Count ) AND
+17394 +                         36968 <= Like_Count  THEN DO;
+17395 +          _NODE_  =                   49;
+17396 +          _LEAF_  =                   38;
+17397 +          P_Total_Actions  =     47490.1282051282;
+17398 +          V_Total_Actions  =     46893.8235294117;
+17399 +          END;
+17400 +        ELSE DO;
+17401 +          IF  NOT MISSING(Retweet_Count ) AND
+17402 +                          7815.5 <= Retweet_Count  THEN DO;
+17403 +            _NODE_  =                   93;
+17404 +            _LEAF_  =                   37;
+17405 +            P_Total_Actions  =              44662.4;
+17406 +            V_Total_Actions  =     43629.6666666666;
+17407 +            END;
+17408 +          ELSE DO;
+17409 +            _NODE_  =                   92;
+17410 +            _LEAF_  =                   36;
+17411 +            P_Total_Actions  =     40920.8214285714;
+17412 +            V_Total_Actions  =     41169.5714285714;
+17413 +            END;
+17414 +          END;
+17415 +        END;
+17416 +      ELSE DO;
+17417 +        IF  NOT MISSING(Like_Count ) AND
+17418 +                       29255.5 <= Like_Count  THEN DO;
+17419 +          IF  NOT MISSING(Retweet_Count ) AND
+17420 +                            6613 <= Retweet_Count  THEN DO;
+17421 +            _NODE_  =                   91;
+17422 +            _LEAF_  =                   35;
+17423 +            P_Total_Actions  =             39058.25;
+17424 +            V_Total_Actions  =     37837.3333333333;
+17425 +            END;
+17426 +          ELSE DO;
+17427 +            _NODE_  =                   90;
+17428 +            _LEAF_  =                   34;
+17429 +            P_Total_Actions  =     36632.7619047619;
+17430 +            V_Total_Actions  =     35467.7777777777;
+17431 +            END;
+17432 +          END;
+17433 +        ELSE DO;
+17434 +          IF  NOT MISSING(Retweet_Count ) AND
+17435 +                          5334.5 <= Retweet_Count  THEN DO;
+17436 +            _NODE_  =                   89;
+17437 +            _LEAF_  =                   33;
+17438 +            P_Total_Actions  =     34467.4583333333;
+17439 +            V_Total_Actions  =             33810.25;
+17440 +            END;
+17441 +          ELSE DO;
+17442 +            _NODE_  =                   88;
+17443 +            _LEAF_  =                   32;
+17444 +            P_Total_Actions  =     32084.9285714285;
+17445 +            V_Total_Actions  =                31388;
+17446 +            END;
+17447 +          END;
+17448 +        END;
+17449 +      END;
+17450 +    END;
+17451 +  END;
+17452 +ELSE DO;
+17453 +  IF  NOT MISSING(Like_Count ) AND
+17454 +                   10555 <= Like_Count  THEN DO;
+17455 +    IF  NOT MISSING(Like_Count ) AND
+17456 +                   17187.5 <= Like_Count  THEN DO;
+17457 +      IF  NOT MISSING(Like_Count ) AND
+17458 +                     21711.5 <= Like_Count  THEN DO;
+17459 +        IF  NOT MISSING(Like_Count ) AND
+17460 +                       24117.5 <= Like_Count  THEN DO;
+17461 +          IF  NOT MISSING(Retweet_Count ) AND
+17462 +                            5562 <= Retweet_Count  THEN DO;
+17463 +            _NODE_  =                   87;
+17464 +            _LEAF_  =                   31;
+17465 +            P_Total_Actions  =              31488.5;
+17466 +            V_Total_Actions  =     31188.3333333333;
+17467 +            END;
+17468 +          ELSE DO;
+17469 +            _NODE_  =                   86;
+17470 +            _LEAF_  =                   30;
+17471 +            P_Total_Actions  =          29660.96875;
+17472 +            V_Total_Actions  =                29453;
+17473 +            END;
+17474 +          END;
+17475 +        ELSE DO;
+17476 +          IF  NOT MISSING(Retweet_Count ) AND
+17477 +                            4904 <= Retweet_Count  THEN DO;
+17478 +            _NODE_  =                   85;
+17479 +            _LEAF_  =                   29;
+17480 +            P_Total_Actions  =     28146.0666666666;
+17481 +            V_Total_Actions  =              28982.2;
+17482 +            END;
+17483 +          ELSE DO;
+17484 +            _NODE_  =                   84;
+17485 +            _LEAF_  =                   28;
+17486 +            P_Total_Actions  =          26633.65625;
+17487 +            V_Total_Actions  =     26452.1538461538;
+17488 +            END;
+17489 +          END;
+17490 +        END;
+17491 +      ELSE DO;
+17492 +        IF  NOT MISSING(Like_Count ) AND
+17493 +          Like_Count  <              18993.5 THEN DO;
+17494 +          _NODE_  =                   42;
+17495 +          _LEAF_  =                   25;
+17496 +          P_Total_Actions  =     21422.7540983606;
+17497 +          V_Total_Actions  =     21518.3636363636;
+17498 +          END;
+17499 +        ELSE DO;
+17500 +          IF  NOT MISSING(Like_Count ) AND
+17501 +                         20317.5 <= Like_Count  THEN DO;
+17502 +            _NODE_  =                   83;
+17503 +            _LEAF_  =                   27;
+17504 +            P_Total_Actions  =     24651.3225806451;
+17505 +            V_Total_Actions  =            24647.375;
+17506 +            END;
+17507 +          ELSE DO;
+17508 +            _NODE_  =                   82;
+17509 +            _LEAF_  =                   26;
+17510 +            P_Total_Actions  =     23186.9428571428;
+17511 +            V_Total_Actions  =     22820.5454545454;
+17512 +            END;
+17513 +          END;
+17514 +        END;
+17515 +      END;
+17516 +    ELSE DO;
+17517 +      IF  NOT MISSING(Like_Count ) AND
+17518 +                     13795.5 <= Like_Count  THEN DO;
+17519 +        IF  NOT MISSING(Like_Count ) AND
+17520 +                       15594.5 <= Like_Count  THEN DO;
+17521 +          IF  NOT MISSING(Retweet_Count ) AND
+17522 +                            3274 <= Retweet_Count  THEN DO;
+17523 +            _NODE_  =                   79;
+17524 +            _LEAF_  =                   24;
+17525 +            P_Total_Actions  =     20228.3181818181;
+17526 +            V_Total_Actions  =              19983.2;
+17527 +            END;
+17528 +          ELSE DO;
+17529 +            _NODE_  =                   78;
+17530 +            _LEAF_  =                   23;
+17531 +            P_Total_Actions  =           18886.5625;
+17532 +            V_Total_Actions  =     18883.8571428571;
+17533 +            END;
+17534 +          END;
+17535 +        ELSE DO;
+17536 +          IF  NOT MISSING(Retweet_Count ) AND
+17537 +                          2779.5 <= Retweet_Count  THEN DO;
+17538 +            _NODE_  =                   77;
+17539 +            _LEAF_  =                   22;
+17540 +            P_Total_Actions  =                18106;
+17541 +            V_Total_Actions  =     18179.3636363636;
+17542 +            END;
+17543 +          ELSE DO;
+17544 +            _NODE_  =                   76;
+17545 +            _LEAF_  =                   21;
+17546 +            P_Total_Actions  =     16885.9183673469;
+17547 +            V_Total_Actions  =              16810.2;
+17548 +            END;
+17549 +          END;
+17550 +        END;
+17551 +      ELSE DO;
+17552 +        IF  NOT MISSING(Like_Count ) AND
+17553 +                         12214 <= Like_Count  THEN DO;
+17554 +          IF  NOT MISSING(Retweet_Count ) AND
+17555 +            Retweet_Count  <                 2136 THEN DO;
+17556 +            _NODE_  =                   74;
+17557 +            _LEAF_  =                   19;
+17558 +            P_Total_Actions  =     14740.9756097561;
+17559 +            V_Total_Actions  =     14768.6666666666;
+17560 +            END;
+17561 +          ELSE DO;
+17562 +            _NODE_  =                   75;
+17563 +            _LEAF_  =                   20;
+17564 +            P_Total_Actions  =     15928.8620689655;
+17565 +            V_Total_Actions  =     15902.6153846153;
+17566 +            END;
+17567 +          END;
+17568 +        ELSE DO;
+17569 +          IF  NOT MISSING(Retweet_Count ) AND
+17570 +            Retweet_Count  <               1943.5 THEN DO;
+17571 +            _NODE_  =                   72;
+17572 +            _LEAF_  =                   17;
+17573 +            P_Total_Actions  =            12852.625;
+17574 +            V_Total_Actions  =      12938.909090909;
+17575 +            END;
+17576 +          ELSE DO;
+17577 +            _NODE_  =                   73;
+17578 +            _LEAF_  =                   18;
+17579 +            P_Total_Actions  =      14001.536231884;
+17580 +            V_Total_Actions  =     14223.5416666666;
+17581 +            END;
+17582 +          END;
+17583 +        END;
+17584 +      END;
+17585 +    END;
+17586 +  ELSE DO;
+17587 +    IF  NOT MISSING(Like_Count ) AND
+17588 +                    5354.5 <= Like_Count  THEN DO;
+17589 +      IF  NOT MISSING(Like_Count ) AND
+17590 +                      7849.5 <= Like_Count  THEN DO;
+17591 +        IF  NOT MISSING(Like_Count ) AND
+17592 +                          9086 <= Like_Count  THEN DO;
+17593 +          IF  NOT MISSING(Retweet_Count ) AND
+17594 +                          1738.5 <= Retweet_Count  THEN DO;
+17595 +            _NODE_  =                   71;
+17596 +            _LEAF_  =                   16;
+17597 +            P_Total_Actions  =     12079.9516129032;
+17598 +            V_Total_Actions  =     11995.5714285714;
+17599 +            END;
+17600 +          ELSE DO;
+17601 +            _NODE_  =                   70;
+17602 +            _LEAF_  =                   15;
+17603 +            P_Total_Actions  =     11125.4054054054;
+17604 +            V_Total_Actions  =     11061.3928571428;
+17605 +            END;
+17606 +          END;
+17607 +        ELSE DO;
+17608 +          IF  NOT MISSING(Retweet_Count ) AND
+17609 +                            1714 <= Retweet_Count  THEN DO;
+17610 +            _NODE_  =                   69;
+17611 +            _LEAF_  =                   14;
+17612 +            P_Total_Actions  =     10624.2857142857;
+17613 +            V_Total_Actions  =      10373.923076923;
+17614 +            END;
+17615 +          ELSE DO;
+17616 +            _NODE_  =                   68;
+17617 +            _LEAF_  =                   13;
+17618 +            P_Total_Actions  =     9763.95726495726;
+17619 +            V_Total_Actions  =               9545.2;
+17620 +            END;
+17621 +          END;
+17622 +        END;
+17623 +      ELSE DO;
+17624 +        IF  NOT MISSING(Like_Count ) AND
+17625 +          Like_Count  <               6503.5 THEN DO;
+17626 +          IF  NOT MISSING(Like_Count ) AND
+17627 +                          6042.5 <= Like_Count  THEN DO;
+17628 +            _NODE_  =                   65;
+17629 +            _LEAF_  =                   10;
+17630 +            P_Total_Actions  =     7309.08860759493;
+17631 +            V_Total_Actions  =     7526.45833333333;
+17632 +            END;
+17633 +          ELSE DO;
+17634 +            _NODE_  =                   64;
+17635 +            _LEAF_  =                    9;
+17636 +            P_Total_Actions  =     6633.57272727272;
+17637 +            V_Total_Actions  =     6593.03703703703;
+17638 +            END;
+17639 +          END;
+17640 +        ELSE DO;
+17641 +          IF  NOT MISSING(Like_Count ) AND
+17642 +                          7226.5 <= Like_Count  THEN DO;
+17643 +            _NODE_  =                   67;
+17644 +            _LEAF_  =                   12;
+17645 +            P_Total_Actions  =     8777.48979591836;
+17646 +            V_Total_Actions  =              8906.25;
+17647 +            END;
+17648 +          ELSE DO;
+17649 +            _NODE_  =                   66;
+17650 +            _LEAF_  =                   11;
+17651 +            P_Total_Actions  =     8068.19379844961;
+17652 +            V_Total_Actions  =               7890.5;
+17653 +            END;
+17654 +          END;
+17655 +        END;
+17656 +      END;
+17657 +    ELSE DO;
+17658 +      IF  NOT MISSING(Like_Count ) AND
+17659 +        Like_Count  <               2944.5 THEN DO;
+17660 +        IF  NOT MISSING(Like_Count ) AND
+17661 +          Like_Count  <                 1744 THEN DO;
+17662 +          IF  NOT MISSING(Like_Count ) AND
+17663 +            Like_Count  <                 1003 THEN DO;
+17664 +            _NODE_  =                   56;
+17665 +            _LEAF_  =                    1;
+17666 +            P_Total_Actions  =      681.48623853211;
+17667 +            V_Total_Actions  =     816.085714285714;
+17668 +            END;
+17669 +          ELSE DO;
+17670 +            _NODE_  =                   57;
+17671 +            _LEAF_  =                    2;
+17672 +            P_Total_Actions  =            1606.6625;
+17673 +            V_Total_Actions  =     1590.79245283018;
+17674 +            END;
+17675 +          END;
+17676 +        ELSE DO;
+17677 +          IF  NOT MISSING(Like_Count ) AND
+17678 +            Like_Count  <               2366.5 THEN DO;
+17679 +            _NODE_  =                   58;
+17680 +            _LEAF_  =                    3;
+17681 +            P_Total_Actions  =       2372.700729927;
+17682 +            V_Total_Actions  =           2423.46875;
+17683 +            END;
+17684 +          ELSE DO;
+17685 +            _NODE_  =                   59;
+17686 +            _LEAF_  =                    4;
+17687 +            P_Total_Actions  =     3088.34666666666;
+17688 +            V_Total_Actions  =               3053.5;
+17689 +            END;
+17690 +          END;
+17691 +        END;
+17692 +      ELSE DO;
+17693 +        IF  NOT MISSING(Like_Count ) AND
+17694 +          Like_Count  <               4050.5 THEN DO;
+17695 +          IF  NOT MISSING(Like_Count ) AND
+17696 +            Like_Count  <               3480.5 THEN DO;
+17697 +            _NODE_  =                   60;
+17698 +            _LEAF_  =                    5;
+17699 +            P_Total_Actions  =             3693.928;
+17700 +            V_Total_Actions  =     3687.02222222222;
+17701 +            END;
+17702 +          ELSE DO;
+17703 +            _NODE_  =                   61;
+17704 +            _LEAF_  =                    6;
+17705 +            P_Total_Actions  =     4424.82191780821;
+17706 +            V_Total_Actions  =     4348.74193548387;
+17707 +            END;
+17708 +          END;
+17709 +        ELSE DO;
+17710 +          IF  NOT MISSING(Like_Count ) AND
+17711 +                            4674 <= Like_Count  THEN DO;
+17712 +            _NODE_  =                   63;
+17713 +            _LEAF_  =                    8;
+17714 +            P_Total_Actions  =     5833.82442748091;
+17715 +            V_Total_Actions  =     5768.81818181818;
+17716 +            END;
+17717 +          ELSE DO;
+17718 +            _NODE_  =                   62;
+17719 +            _LEAF_  =                    7;
+17720 +            P_Total_Actions  =     5067.40782122905;
+17721 +            V_Total_Actions  =             5136.825;
+17722 +            END;
+17723 +          END;
+17724 +        END;
+17725 +      END;
+17726 +    END;
+17727 +  END;
+17728 +
+17729 +*****  RESIDUALS R_ *************;
+17730 +IF MISSING( Total_Actions ) THEN R_Total_Actions  = .;
+17731 +ELSE R_Total_Actions  = Total_Actions  - P_Total_Actions ;
+17732 +
+17733 +****************************************************************;
+17734 +******          END OF DECISION TREE SCORING CODE         ******;
+17735 +****************************************************************;
+17736 +
+17737 +drop _LEAF_;
+NOTE: %INCLUDE (level 1) ending.
+17738  run;
+
+NOTE: DATA STEP view saved on file EMWS5.TREE_TRAIN.
+NOTE: A stored DATA STEP view cannot run under a different operating system.
+NOTE: DATA statement used (Total process time):
+      real time           0.05 seconds
+      cpu time            0.04 seconds
+      
+
+17739  quit;
+17740  filename emflow;
+NOTE: Fileref EMFLOW has been deassigned.
+
+17741  filename emflow "P:\DMBI_Project\Twitter_Insta_Content_Engineering\Workspaces\EMWS5\Tree\EMFLOWSCORE.sas";
+17742  *------------------------------------------------------------*;
+17743  * Tree: Scoring VALIDATE data;
+17744  *------------------------------------------------------------*;
+17745  data EMWS5.Tree_VALIDATE
+17746  / view=EMWS5.Tree_VALIDATE
+17747  ;
+17748  set EMWS5.TextTopic_VALIDATE
+17749  ;
+17750  %inc emflow;
+NOTE: %INCLUDE (level 1) file EMFLOW is file P:\DMBI_Project\Twitter_Insta_Content_Engineering\Workspaces\EMWS5\Tree\EMFLOWSCORE.sas.
+17751 +****************************************************************;
+17752 +******             DECISION TREE SCORING CODE             ******;
+17753 +****************************************************************;
+17754 +
+17755 +******         LENGTHS OF NEW CHARACTER VARIABLES         ******;
+17756 +LENGTH _WARN_  $    4;
+17757 +
+17758 +******              LABELS FOR NEW VARIABLES              ******;
+17759 +label _NODE_ = 'Node' ;
+17760 +label _LEAF_ = 'Leaf' ;
+17761 +label P_Total_Actions = 'Predicted: Total_Actions' ;
+17762 +label V_Total_Actions = 'Validated: Total_Actions' ;
+17763 +label R_Total_Actions = 'Residual: Total_Actions' ;
+17764 +label _WARN_ = 'Warnings' ;
+17765 +
+17766 +
+17767 +
+17768 +******             ASSIGN OBSERVATION TO NODE             ******;
+17769 +IF  NOT MISSING(Like_Count ) AND
+17770 +                 26244 <= Like_Count  THEN DO;
+17771 +  IF  NOT MISSING(Like_Count ) AND
+17772 +                   61279 <= Like_Count  THEN DO;
+17773 +    IF  NOT MISSING(Like_Count ) AND
+17774 +                   94861.5 <= Like_Count  THEN DO;
+17775 +      _NODE_  =                   15;
+17776 +      _LEAF_  =                   49;
+17777 +      P_Total_Actions  =     158441.857142857;
+17778 +      V_Total_Actions  =               176878;
+17779 +      END;
+17780 +    ELSE DO;
+17781 +      IF  NOT MISSING(Like_Count ) AND
+17782 +                     73445.5 <= Like_Count  THEN DO;
+17783 +        _NODE_  =                   29;
+17784 +        _LEAF_  =                   48;
+17785 +        P_Total_Actions  =     102068.222222222;
+17786 +        V_Total_Actions  =               100576;
+17787 +        END;
+17788 +      ELSE DO;
+17789 +        IF  NOT MISSING(TextCluster_SVD39 ) AND
+17790 +          TextCluster_SVD39  <    -0.01650754330562 THEN DO;
+17791 +          _NODE_  =                   54;
+17792 +          _LEAF_  =                   45;
+17793 +          P_Total_Actions  =     86650.8571428571;
+17794 +          V_Total_Actions  =              80876.5;
+17795 +          END;
+17796 +        ELSE DO;
+17797 +          IF  NOT MISSING(Like_Count ) AND
+17798 +            Like_Count  <              65336.5 THEN DO;
+17799 +            _NODE_  =                  104;
+17800 +            _LEAF_  =                   46;
+17801 +            P_Total_Actions  =                76800;
+17802 +            V_Total_Actions  =                76985;
+17803 +            END;
+17804 +          ELSE DO;
+17805 +            _NODE_  =                  105;
+17806 +            _LEAF_  =                   47;
+17807 +            P_Total_Actions  =                83134;
+17808 +            V_Total_Actions  =                78421;
+17809 +            END;
+17810 +          END;
+17811 +        END;
+17812 +      END;
+17813 +    END;
+17814 +  ELSE DO;
+17815 +    IF  NOT MISSING(Like_Count ) AND
+17816 +                   42625.5 <= Like_Count  THEN DO;
+17817 +      IF  NOT MISSING(Like_Count ) AND
+17818 +                     50758.5 <= Like_Count  THEN DO;
+17819 +        IF  NOT MISSING(Like_Count ) AND
+17820 +          Like_Count  <              54811.5 THEN DO;
+17821 +          _NODE_  =                   52;
+17822 +          _LEAF_  =                   42;
+17823 +          P_Total_Actions  =     64541.7272727272;
+17824 +          V_Total_Actions  =     65511.7142857142;
+17825 +          END;
+17826 +        ELSE DO;
+17827 +          IF  NOT MISSING(Retweet_Count ) AND
+17828 +            Retweet_Count  <                 9768 THEN DO;
+17829 +            _NODE_  =                  102;
+17830 +            _LEAF_  =                   43;
+17831 +            P_Total_Actions  =              65888.6;
+17832 +            V_Total_Actions  =              68721.5;
+17833 +            END;
+17834 +          ELSE DO;
+17835 +            _NODE_  =                  103;
+17836 +            _LEAF_  =                   44;
+17837 +            P_Total_Actions  =     71534.9411764706;
+17838 +            V_Total_Actions  =     73987.2857142857;
+17839 +            END;
+17840 +          END;
+17841 +        END;
+17842 +      ELSE DO;
+17843 +        IF  NOT MISSING(Like_Count ) AND
+17844 +                       47978.5 <= Like_Count  THEN DO;
+17845 +          IF  NOT MISSING(Retweet_Count ) AND
+17846 +                         10851.5 <= Retweet_Count  THEN DO;
+17847 +            _NODE_  =                   99;
+17848 +            _LEAF_  =                   41;
+17849 +            P_Total_Actions  =                62895;
+17850 +            V_Total_Actions  =                66275;
+17851 +            END;
+17852 +          ELSE DO;
+17853 +            _NODE_  =                   98;
+17854 +            _LEAF_  =                   40;
+17855 +            P_Total_Actions  =                58360;
+17856 +            V_Total_Actions  =                58556;
+17857 +            END;
+17858 +          END;
+17859 +        ELSE DO;
+17860 +          _NODE_  =                   50;
+17861 +          _LEAF_  =                   39;
+17862 +          P_Total_Actions  =     54199.6551724138;
+17863 +          V_Total_Actions  =     55754.8333333333;
+17864 +          END;
+17865 +        END;
+17866 +      END;
+17867 +    ELSE DO;
+17868 +      IF  NOT MISSING(Like_Count ) AND
+17869 +                       32578 <= Like_Count  THEN DO;
+17870 +        IF  NOT MISSING(Like_Count ) AND
+17871 +                         36968 <= Like_Count  THEN DO;
+17872 +          _NODE_  =                   49;
+17873 +          _LEAF_  =                   38;
+17874 +          P_Total_Actions  =     47490.1282051282;
+17875 +          V_Total_Actions  =     46893.8235294117;
+17876 +          END;
+17877 +        ELSE DO;
+17878 +          IF  NOT MISSING(Retweet_Count ) AND
+17879 +                          7815.5 <= Retweet_Count  THEN DO;
+17880 +            _NODE_  =                   93;
+17881 +            _LEAF_  =                   37;
+17882 +            P_Total_Actions  =              44662.4;
+17883 +            V_Total_Actions  =     43629.6666666666;
+17884 +            END;
+17885 +          ELSE DO;
+17886 +            _NODE_  =                   92;
+17887 +            _LEAF_  =                   36;
+17888 +            P_Total_Actions  =     40920.8214285714;
+17889 +            V_Total_Actions  =     41169.5714285714;
+17890 +            END;
+17891 +          END;
+17892 +        END;
+17893 +      ELSE DO;
+17894 +        IF  NOT MISSING(Like_Count ) AND
+17895 +                       29255.5 <= Like_Count  THEN DO;
+17896 +          IF  NOT MISSING(Retweet_Count ) AND
+17897 +                            6613 <= Retweet_Count  THEN DO;
+17898 +            _NODE_  =                   91;
+17899 +            _LEAF_  =                   35;
+17900 +            P_Total_Actions  =             39058.25;
+17901 +            V_Total_Actions  =     37837.3333333333;
+17902 +            END;
+17903 +          ELSE DO;
+17904 +            _NODE_  =                   90;
+17905 +            _LEAF_  =                   34;
+17906 +            P_Total_Actions  =     36632.7619047619;
+17907 +            V_Total_Actions  =     35467.7777777777;
+17908 +            END;
+17909 +          END;
+17910 +        ELSE DO;
+17911 +          IF  NOT MISSING(Retweet_Count ) AND
+17912 +                          5334.5 <= Retweet_Count  THEN DO;
+17913 +            _NODE_  =                   89;
+17914 +            _LEAF_  =                   33;
+17915 +            P_Total_Actions  =     34467.4583333333;
+17916 +            V_Total_Actions  =             33810.25;
+17917 +            END;
+17918 +          ELSE DO;
+17919 +            _NODE_  =                   88;
+17920 +            _LEAF_  =                   32;
+17921 +            P_Total_Actions  =     32084.9285714285;
+17922 +            V_Total_Actions  =                31388;
+17923 +            END;
+17924 +          END;
+17925 +        END;
+17926 +      END;
+17927 +    END;
+17928 +  END;
+17929 +ELSE DO;
+17930 +  IF  NOT MISSING(Like_Count ) AND
+17931 +                   10555 <= Like_Count  THEN DO;
+17932 +    IF  NOT MISSING(Like_Count ) AND
+17933 +                   17187.5 <= Like_Count  THEN DO;
+17934 +      IF  NOT MISSING(Like_Count ) AND
+17935 +                     21711.5 <= Like_Count  THEN DO;
+17936 +        IF  NOT MISSING(Like_Count ) AND
+17937 +                       24117.5 <= Like_Count  THEN DO;
+17938 +          IF  NOT MISSING(Retweet_Count ) AND
+17939 +                            5562 <= Retweet_Count  THEN DO;
+17940 +            _NODE_  =                   87;
+17941 +            _LEAF_  =                   31;
+17942 +            P_Total_Actions  =              31488.5;
+17943 +            V_Total_Actions  =     31188.3333333333;
+17944 +            END;
+17945 +          ELSE DO;
+17946 +            _NODE_  =                   86;
+17947 +            _LEAF_  =                   30;
+17948 +            P_Total_Actions  =          29660.96875;
+17949 +            V_Total_Actions  =                29453;
+17950 +            END;
+17951 +          END;
+17952 +        ELSE DO;
+17953 +          IF  NOT MISSING(Retweet_Count ) AND
+17954 +                            4904 <= Retweet_Count  THEN DO;
+17955 +            _NODE_  =                   85;
+17956 +            _LEAF_  =                   29;
+17957 +            P_Total_Actions  =     28146.0666666666;
+17958 +            V_Total_Actions  =              28982.2;
+17959 +            END;
+17960 +          ELSE DO;
+17961 +            _NODE_  =                   84;
+17962 +            _LEAF_  =                   28;
+17963 +            P_Total_Actions  =          26633.65625;
+17964 +            V_Total_Actions  =     26452.1538461538;
+17965 +            END;
+17966 +          END;
+17967 +        END;
+17968 +      ELSE DO;
+17969 +        IF  NOT MISSING(Like_Count ) AND
+17970 +          Like_Count  <              18993.5 THEN DO;
+17971 +          _NODE_  =                   42;
+17972 +          _LEAF_  =                   25;
+17973 +          P_Total_Actions  =     21422.7540983606;
+17974 +          V_Total_Actions  =     21518.3636363636;
+17975 +          END;
+17976 +        ELSE DO;
+17977 +          IF  NOT MISSING(Like_Count ) AND
+17978 +                         20317.5 <= Like_Count  THEN DO;
+17979 +            _NODE_  =                   83;
+17980 +            _LEAF_  =                   27;
+17981 +            P_Total_Actions  =     24651.3225806451;
+17982 +            V_Total_Actions  =            24647.375;
+17983 +            END;
+17984 +          ELSE DO;
+17985 +            _NODE_  =                   82;
+17986 +            _LEAF_  =                   26;
+17987 +            P_Total_Actions  =     23186.9428571428;
+17988 +            V_Total_Actions  =     22820.5454545454;
+17989 +            END;
+17990 +          END;
+17991 +        END;
+17992 +      END;
+17993 +    ELSE DO;
+17994 +      IF  NOT MISSING(Like_Count ) AND
+17995 +                     13795.5 <= Like_Count  THEN DO;
+17996 +        IF  NOT MISSING(Like_Count ) AND
+17997 +                       15594.5 <= Like_Count  THEN DO;
+17998 +          IF  NOT MISSING(Retweet_Count ) AND
+17999 +                            3274 <= Retweet_Count  THEN DO;
+18000 +            _NODE_  =                   79;
+18001 +            _LEAF_  =                   24;
+18002 +            P_Total_Actions  =     20228.3181818181;
+18003 +            V_Total_Actions  =              19983.2;
+18004 +            END;
+18005 +          ELSE DO;
+18006 +            _NODE_  =                   78;
+18007 +            _LEAF_  =                   23;
+18008 +            P_Total_Actions  =           18886.5625;
+18009 +            V_Total_Actions  =     18883.8571428571;
+18010 +            END;
+18011 +          END;
+18012 +        ELSE DO;
+18013 +          IF  NOT MISSING(Retweet_Count ) AND
+18014 +                          2779.5 <= Retweet_Count  THEN DO;
+18015 +            _NODE_  =                   77;
+18016 +            _LEAF_  =                   22;
+18017 +            P_Total_Actions  =                18106;
+18018 +            V_Total_Actions  =     18179.3636363636;
+18019 +            END;
+18020 +          ELSE DO;
+18021 +            _NODE_  =                   76;
+18022 +            _LEAF_  =                   21;
+18023 +            P_Total_Actions  =     16885.9183673469;
+18024 +            V_Total_Actions  =              16810.2;
+18025 +            END;
+18026 +          END;
+18027 +        END;
+18028 +      ELSE DO;
+18029 +        IF  NOT MISSING(Like_Count ) AND
+18030 +                         12214 <= Like_Count  THEN DO;
+18031 +          IF  NOT MISSING(Retweet_Count ) AND
+18032 +            Retweet_Count  <                 2136 THEN DO;
+18033 +            _NODE_  =                   74;
+18034 +            _LEAF_  =                   19;
+18035 +            P_Total_Actions  =     14740.9756097561;
+18036 +            V_Total_Actions  =     14768.6666666666;
+18037 +            END;
+18038 +          ELSE DO;
+18039 +            _NODE_  =                   75;
+18040 +            _LEAF_  =                   20;
+18041 +            P_Total_Actions  =     15928.8620689655;
+18042 +            V_Total_Actions  =     15902.6153846153;
+18043 +            END;
+18044 +          END;
+18045 +        ELSE DO;
+18046 +          IF  NOT MISSING(Retweet_Count ) AND
+18047 +            Retweet_Count  <               1943.5 THEN DO;
+18048 +            _NODE_  =                   72;
+18049 +            _LEAF_  =                   17;
+18050 +            P_Total_Actions  =            12852.625;
+18051 +            V_Total_Actions  =      12938.909090909;
+18052 +            END;
+18053 +          ELSE DO;
+18054 +            _NODE_  =                   73;
+18055 +            _LEAF_  =                   18;
+18056 +            P_Total_Actions  =      14001.536231884;
+18057 +            V_Total_Actions  =     14223.5416666666;
+18058 +            END;
+18059 +          END;
+18060 +        END;
+18061 +      END;
+18062 +    END;
+18063 +  ELSE DO;
+18064 +    IF  NOT MISSING(Like_Count ) AND
+18065 +                    5354.5 <= Like_Count  THEN DO;
+18066 +      IF  NOT MISSING(Like_Count ) AND
+18067 +                      7849.5 <= Like_Count  THEN DO;
+18068 +        IF  NOT MISSING(Like_Count ) AND
+18069 +                          9086 <= Like_Count  THEN DO;
+18070 +          IF  NOT MISSING(Retweet_Count ) AND
+18071 +                          1738.5 <= Retweet_Count  THEN DO;
+18072 +            _NODE_  =                   71;
+18073 +            _LEAF_  =                   16;
+18074 +            P_Total_Actions  =     12079.9516129032;
+18075 +            V_Total_Actions  =     11995.5714285714;
+18076 +            END;
+18077 +          ELSE DO;
+18078 +            _NODE_  =                   70;
+18079 +            _LEAF_  =                   15;
+18080 +            P_Total_Actions  =     11125.4054054054;
+18081 +            V_Total_Actions  =     11061.3928571428;
+18082 +            END;
+18083 +          END;
+18084 +        ELSE DO;
+18085 +          IF  NOT MISSING(Retweet_Count ) AND
+18086 +                            1714 <= Retweet_Count  THEN DO;
+18087 +            _NODE_  =                   69;
+18088 +            _LEAF_  =                   14;
+18089 +            P_Total_Actions  =     10624.2857142857;
+18090 +            V_Total_Actions  =      10373.923076923;
+18091 +            END;
+18092 +          ELSE DO;
+18093 +            _NODE_  =                   68;
+18094 +            _LEAF_  =                   13;
+18095 +            P_Total_Actions  =     9763.95726495726;
+18096 +            V_Total_Actions  =               9545.2;
+18097 +            END;
+18098 +          END;
+18099 +        END;
+18100 +      ELSE DO;
+18101 +        IF  NOT MISSING(Like_Count ) AND
+18102 +          Like_Count  <               6503.5 THEN DO;
+18103 +          IF  NOT MISSING(Like_Count ) AND
+18104 +                          6042.5 <= Like_Count  THEN DO;
+18105 +            _NODE_  =                   65;
+18106 +            _LEAF_  =                   10;
+18107 +            P_Total_Actions  =     7309.08860759493;
+18108 +            V_Total_Actions  =     7526.45833333333;
+18109 +            END;
+18110 +          ELSE DO;
+18111 +            _NODE_  =                   64;
+18112 +            _LEAF_  =                    9;
+18113 +            P_Total_Actions  =     6633.57272727272;
+18114 +            V_Total_Actions  =     6593.03703703703;
+18115 +            END;
+18116 +          END;
+18117 +        ELSE DO;
+18118 +          IF  NOT MISSING(Like_Count ) AND
+18119 +                          7226.5 <= Like_Count  THEN DO;
+18120 +            _NODE_  =                   67;
+18121 +            _LEAF_  =                   12;
+18122 +            P_Total_Actions  =     8777.48979591836;
+18123 +            V_Total_Actions  =              8906.25;
+18124 +            END;
+18125 +          ELSE DO;
+18126 +            _NODE_  =                   66;
+18127 +            _LEAF_  =                   11;
+18128 +            P_Total_Actions  =     8068.19379844961;
+18129 +            V_Total_Actions  =               7890.5;
+18130 +            END;
+18131 +          END;
+18132 +        END;
+18133 +      END;
+18134 +    ELSE DO;
+18135 +      IF  NOT MISSING(Like_Count ) AND
+18136 +        Like_Count  <               2944.5 THEN DO;
+18137 +        IF  NOT MISSING(Like_Count ) AND
+18138 +          Like_Count  <                 1744 THEN DO;
+18139 +          IF  NOT MISSING(Like_Count ) AND
+18140 +            Like_Count  <                 1003 THEN DO;
+18141 +            _NODE_  =                   56;
+18142 +            _LEAF_  =                    1;
+18143 +            P_Total_Actions  =      681.48623853211;
+18144 +            V_Total_Actions  =     816.085714285714;
+18145 +            END;
+18146 +          ELSE DO;
+18147 +            _NODE_  =                   57;
+18148 +            _LEAF_  =                    2;
+18149 +            P_Total_Actions  =            1606.6625;
+18150 +            V_Total_Actions  =     1590.79245283018;
+18151 +            END;
+18152 +          END;
+18153 +        ELSE DO;
+18154 +          IF  NOT MISSING(Like_Count ) AND
+18155 +            Like_Count  <               2366.5 THEN DO;
+18156 +            _NODE_  =                   58;
+18157 +            _LEAF_  =                    3;
+18158 +            P_Total_Actions  =       2372.700729927;
+18159 +            V_Total_Actions  =           2423.46875;
+18160 +            END;
+18161 +          ELSE DO;
+18162 +            _NODE_  =                   59;
+18163 +            _LEAF_  =                    4;
+18164 +            P_Total_Actions  =     3088.34666666666;
+18165 +            V_Total_Actions  =               3053.5;
+18166 +            END;
+18167 +          END;
+18168 +        END;
+18169 +      ELSE DO;
+18170 +        IF  NOT MISSING(Like_Count ) AND
+18171 +          Like_Count  <               4050.5 THEN DO;
+18172 +          IF  NOT MISSING(Like_Count ) AND
+18173 +            Like_Count  <               3480.5 THEN DO;
+18174 +            _NODE_  =                   60;
+18175 +            _LEAF_  =                    5;
+18176 +            P_Total_Actions  =             3693.928;
+18177 +            V_Total_Actions  =     3687.02222222222;
+18178 +            END;
+18179 +          ELSE DO;
+18180 +            _NODE_  =                   61;
+18181 +            _LEAF_  =                    6;
+18182 +            P_Total_Actions  =     4424.82191780821;
+18183 +            V_Total_Actions  =     4348.74193548387;
+18184 +            END;
+18185 +          END;
+18186 +        ELSE DO;
+18187 +          IF  NOT MISSING(Like_Count ) AND
+18188 +                            4674 <= Like_Count  THEN DO;
+18189 +            _NODE_  =                   63;
+18190 +            _LEAF_  =                    8;
+18191 +            P_Total_Actions  =     5833.82442748091;
+18192 +            V_Total_Actions  =     5768.81818181818;
+18193 +            END;
+18194 +          ELSE DO;
+18195 +            _NODE_  =                   62;
+18196 +            _LEAF_  =                    7;
+18197 +            P_Total_Actions  =     5067.40782122905;
+18198 +            V_Total_Actions  =             5136.825;
+18199 +            END;
+18200 +          END;
+18201 +        END;
+18202 +      END;
+18203 +    END;
+18204 +  END;
+18205 +
+18206 +*****  RESIDUALS R_ *************;
+18207 +IF MISSING( Total_Actions ) THEN R_Total_Actions  = .;
+18208 +ELSE R_Total_Actions  = Total_Actions  - P_Total_Actions ;
+18209 +
+18210 +****************************************************************;
+18211 +******          END OF DECISION TREE SCORING CODE         ******;
+18212 +****************************************************************;
+18213 +
+18214 +drop _LEAF_;
+NOTE: %INCLUDE (level 1) ending.
+18215  run;
+
+NOTE: DATA STEP view saved on file EMWS5.TREE_VALIDATE.
+NOTE: A stored DATA STEP view cannot run under a different operating system.
+NOTE: DATA statement used (Total process time):
+      real time           0.05 seconds
+      cpu time            0.03 seconds
+      
+
+18216  quit;
+18217  filename emflow;
+NOTE: Fileref EMFLOW has been deassigned.
+
+18218  filename emflow "P:\DMBI_Project\Twitter_Insta_Content_Engineering\Workspaces\EMWS5\Tree\EMFLOWSCORE.sas";
+18219  *------------------------------------------------------------*;
+18220  * Tree: Scoring TEST data;
+18221  *------------------------------------------------------------*;
+18222  data EMWS5.Tree_TEST
+18223  / view=EMWS5.Tree_TEST
+18224  ;
+18225  set EMWS5.TextTopic_TEST
+18226  ;
+18227  %inc emflow;
+NOTE: %INCLUDE (level 1) file EMFLOW is file P:\DMBI_Project\Twitter_Insta_Content_Engineering\Workspaces\EMWS5\Tree\EMFLOWSCORE.sas.
+18228 +****************************************************************;
+18229 +******             DECISION TREE SCORING CODE             ******;
+18230 +****************************************************************;
+18231 +
+18232 +******         LENGTHS OF NEW CHARACTER VARIABLES         ******;
+18233 +LENGTH _WARN_  $    4;
+18234 +
+18235 +******              LABELS FOR NEW VARIABLES              ******;
+18236 +label _NODE_ = 'Node' ;
+18237 +label _LEAF_ = 'Leaf' ;
+18238 +label P_Total_Actions = 'Predicted: Total_Actions' ;
+18239 +label V_Total_Actions = 'Validated: Total_Actions' ;
+18240 +label R_Total_Actions = 'Residual: Total_Actions' ;
+18241 +label _WARN_ = 'Warnings' ;
+18242 +
+18243 +
+18244 +
+18245 +******             ASSIGN OBSERVATION TO NODE             ******;
+18246 +IF  NOT MISSING(Like_Count ) AND
+18247 +                 26244 <= Like_Count  THEN DO;
+18248 +  IF  NOT MISSING(Like_Count ) AND
+18249 +                   61279 <= Like_Count  THEN DO;
+18250 +    IF  NOT MISSING(Like_Count ) AND
+18251 +                   94861.5 <= Like_Count  THEN DO;
+18252 +      _NODE_  =                   15;
+18253 +      _LEAF_  =                   49;
+18254 +      P_Total_Actions  =     158441.857142857;
+18255 +      V_Total_Actions  =               176878;
+18256 +      END;
+18257 +    ELSE DO;
+18258 +      IF  NOT MISSING(Like_Count ) AND
+18259 +                     73445.5 <= Like_Count  THEN DO;
+18260 +        _NODE_  =                   29;
+18261 +        _LEAF_  =                   48;
+18262 +        P_Total_Actions  =     102068.222222222;
+18263 +        V_Total_Actions  =               100576;
+18264 +        END;
+18265 +      ELSE DO;
+18266 +        IF  NOT MISSING(TextCluster_SVD39 ) AND
+18267 +          TextCluster_SVD39  <    -0.01650754330562 THEN DO;
+18268 +          _NODE_  =                   54;
+18269 +          _LEAF_  =                   45;
+18270 +          P_Total_Actions  =     86650.8571428571;
+18271 +          V_Total_Actions  =              80876.5;
+18272 +          END;
+18273 +        ELSE DO;
+18274 +          IF  NOT MISSING(Like_Count ) AND
+18275 +            Like_Count  <              65336.5 THEN DO;
+18276 +            _NODE_  =                  104;
+18277 +            _LEAF_  =                   46;
+18278 +            P_Total_Actions  =                76800;
+18279 +            V_Total_Actions  =                76985;
+18280 +            END;
+18281 +          ELSE DO;
+18282 +            _NODE_  =                  105;
+18283 +            _LEAF_  =                   47;
+18284 +            P_Total_Actions  =                83134;
+18285 +            V_Total_Actions  =                78421;
+18286 +            END;
+18287 +          END;
+18288 +        END;
+18289 +      END;
+18290 +    END;
+18291 +  ELSE DO;
+18292 +    IF  NOT MISSING(Like_Count ) AND
+18293 +                   42625.5 <= Like_Count  THEN DO;
+18294 +      IF  NOT MISSING(Like_Count ) AND
+18295 +                     50758.5 <= Like_Count  THEN DO;
+18296 +        IF  NOT MISSING(Like_Count ) AND
+18297 +          Like_Count  <              54811.5 THEN DO;
+18298 +          _NODE_  =                   52;
+18299 +          _LEAF_  =                   42;
+18300 +          P_Total_Actions  =     64541.7272727272;
+18301 +          V_Total_Actions  =     65511.7142857142;
+18302 +          END;
+18303 +        ELSE DO;
+18304 +          IF  NOT MISSING(Retweet_Count ) AND
+18305 +            Retweet_Count  <                 9768 THEN DO;
+18306 +            _NODE_  =                  102;
+18307 +            _LEAF_  =                   43;
+18308 +            P_Total_Actions  =              65888.6;
+18309 +            V_Total_Actions  =              68721.5;
+18310 +            END;
+18311 +          ELSE DO;
+18312 +            _NODE_  =                  103;
+18313 +            _LEAF_  =                   44;
+18314 +            P_Total_Actions  =     71534.9411764706;
+18315 +            V_Total_Actions  =     73987.2857142857;
+18316 +            END;
+18317 +          END;
+18318 +        END;
+18319 +      ELSE DO;
+18320 +        IF  NOT MISSING(Like_Count ) AND
+18321 +                       47978.5 <= Like_Count  THEN DO;
+18322 +          IF  NOT MISSING(Retweet_Count ) AND
+18323 +                         10851.5 <= Retweet_Count  THEN DO;
+18324 +            _NODE_  =                   99;
+18325 +            _LEAF_  =                   41;
+18326 +            P_Total_Actions  =                62895;
+18327 +            V_Total_Actions  =                66275;
+18328 +            END;
+18329 +          ELSE DO;
+18330 +            _NODE_  =                   98;
+18331 +            _LEAF_  =                   40;
+18332 +            P_Total_Actions  =                58360;
+18333 +            V_Total_Actions  =                58556;
+18334 +            END;
+18335 +          END;
+18336 +        ELSE DO;
+18337 +          _NODE_  =                   50;
+18338 +          _LEAF_  =                   39;
+18339 +          P_Total_Actions  =     54199.6551724138;
+18340 +          V_Total_Actions  =     55754.8333333333;
+18341 +          END;
+18342 +        END;
+18343 +      END;
+18344 +    ELSE DO;
+18345 +      IF  NOT MISSING(Like_Count ) AND
+18346 +                       32578 <= Like_Count  THEN DO;
+18347 +        IF  NOT MISSING(Like_Count ) AND
+18348 +                         36968 <= Like_Count  THEN DO;
+18349 +          _NODE_  =                   49;
+18350 +          _LEAF_  =                   38;
+18351 +          P_Total_Actions  =     47490.1282051282;
+18352 +          V_Total_Actions  =     46893.8235294117;
+18353 +          END;
+18354 +        ELSE DO;
+18355 +          IF  NOT MISSING(Retweet_Count ) AND
+18356 +                          7815.5 <= Retweet_Count  THEN DO;
+18357 +            _NODE_  =                   93;
+18358 +            _LEAF_  =                   37;
+18359 +            P_Total_Actions  =              44662.4;
+18360 +            V_Total_Actions  =     43629.6666666666;
+18361 +            END;
+18362 +          ELSE DO;
+18363 +            _NODE_  =                   92;
+18364 +            _LEAF_  =                   36;
+18365 +            P_Total_Actions  =     40920.8214285714;
+18366 +            V_Total_Actions  =     41169.5714285714;
+18367 +            END;
+18368 +          END;
+18369 +        END;
+18370 +      ELSE DO;
+18371 +        IF  NOT MISSING(Like_Count ) AND
+18372 +                       29255.5 <= Like_Count  THEN DO;
+18373 +          IF  NOT MISSING(Retweet_Count ) AND
+18374 +                            6613 <= Retweet_Count  THEN DO;
+18375 +            _NODE_  =                   91;
+18376 +            _LEAF_  =                   35;
+18377 +            P_Total_Actions  =             39058.25;
+18378 +            V_Total_Actions  =     37837.3333333333;
+18379 +            END;
+18380 +          ELSE DO;
+18381 +            _NODE_  =                   90;
+18382 +            _LEAF_  =                   34;
+18383 +            P_Total_Actions  =     36632.7619047619;
+18384 +            V_Total_Actions  =     35467.7777777777;
+18385 +            END;
+18386 +          END;
+18387 +        ELSE DO;
+18388 +          IF  NOT MISSING(Retweet_Count ) AND
+18389 +                          5334.5 <= Retweet_Count  THEN DO;
+18390 +            _NODE_  =                   89;
+18391 +            _LEAF_  =                   33;
+18392 +            P_Total_Actions  =     34467.4583333333;
+18393 +            V_Total_Actions  =             33810.25;
+18394 +            END;
+18395 +          ELSE DO;
+18396 +            _NODE_  =                   88;
+18397 +            _LEAF_  =                   32;
+18398 +            P_Total_Actions  =     32084.9285714285;
+18399 +            V_Total_Actions  =                31388;
+18400 +            END;
+18401 +          END;
+18402 +        END;
+18403 +      END;
+18404 +    END;
+18405 +  END;
+18406 +ELSE DO;
+18407 +  IF  NOT MISSING(Like_Count ) AND
+18408 +                   10555 <= Like_Count  THEN DO;
+18409 +    IF  NOT MISSING(Like_Count ) AND
+18410 +                   17187.5 <= Like_Count  THEN DO;
+18411 +      IF  NOT MISSING(Like_Count ) AND
+18412 +                     21711.5 <= Like_Count  THEN DO;
+18413 +        IF  NOT MISSING(Like_Count ) AND
+18414 +                       24117.5 <= Like_Count  THEN DO;
+18415 +          IF  NOT MISSING(Retweet_Count ) AND
+18416 +                            5562 <= Retweet_Count  THEN DO;
+18417 +            _NODE_  =                   87;
+18418 +            _LEAF_  =                   31;
+18419 +            P_Total_Actions  =              31488.5;
+18420 +            V_Total_Actions  =     31188.3333333333;
+18421 +            END;
+18422 +          ELSE DO;
+18423 +            _NODE_  =                   86;
+18424 +            _LEAF_  =                   30;
+18425 +            P_Total_Actions  =          29660.96875;
+18426 +            V_Total_Actions  =                29453;
+18427 +            END;
+18428 +          END;
+18429 +        ELSE DO;
+18430 +          IF  NOT MISSING(Retweet_Count ) AND
+18431 +                            4904 <= Retweet_Count  THEN DO;
+18432 +            _NODE_  =                   85;
+18433 +            _LEAF_  =                   29;
+18434 +            P_Total_Actions  =     28146.0666666666;
+18435 +            V_Total_Actions  =              28982.2;
+18436 +            END;
+18437 +          ELSE DO;
+18438 +            _NODE_  =                   84;
+18439 +            _LEAF_  =                   28;
+18440 +            P_Total_Actions  =          26633.65625;
+18441 +            V_Total_Actions  =     26452.1538461538;
+18442 +            END;
+18443 +          END;
+18444 +        END;
+18445 +      ELSE DO;
+18446 +        IF  NOT MISSING(Like_Count ) AND
+18447 +          Like_Count  <              18993.5 THEN DO;
+18448 +          _NODE_  =                   42;
+18449 +          _LEAF_  =                   25;
+18450 +          P_Total_Actions  =     21422.7540983606;
+18451 +          V_Total_Actions  =     21518.3636363636;
+18452 +          END;
+18453 +        ELSE DO;
+18454 +          IF  NOT MISSING(Like_Count ) AND
+18455 +                         20317.5 <= Like_Count  THEN DO;
+18456 +            _NODE_  =                   83;
+18457 +            _LEAF_  =                   27;
+18458 +            P_Total_Actions  =     24651.3225806451;
+18459 +            V_Total_Actions  =            24647.375;
+18460 +            END;
+18461 +          ELSE DO;
+18462 +            _NODE_  =                   82;
+18463 +            _LEAF_  =                   26;
+18464 +            P_Total_Actions  =     23186.9428571428;
+18465 +            V_Total_Actions  =     22820.5454545454;
+18466 +            END;
+18467 +          END;
+18468 +        END;
+18469 +      END;
+18470 +    ELSE DO;
+18471 +      IF  NOT MISSING(Like_Count ) AND
+18472 +                     13795.5 <= Like_Count  THEN DO;
+18473 +        IF  NOT MISSING(Like_Count ) AND
+18474 +                       15594.5 <= Like_Count  THEN DO;
+18475 +          IF  NOT MISSING(Retweet_Count ) AND
+18476 +                            3274 <= Retweet_Count  THEN DO;
+18477 +            _NODE_  =                   79;
+18478 +            _LEAF_  =                   24;
+18479 +            P_Total_Actions  =     20228.3181818181;
+18480 +            V_Total_Actions  =              19983.2;
+18481 +            END;
+18482 +          ELSE DO;
+18483 +            _NODE_  =                   78;
+18484 +            _LEAF_  =                   23;
+18485 +            P_Total_Actions  =           18886.5625;
+18486 +            V_Total_Actions  =     18883.8571428571;
+18487 +            END;
+18488 +          END;
+18489 +        ELSE DO;
+18490 +          IF  NOT MISSING(Retweet_Count ) AND
+18491 +                          2779.5 <= Retweet_Count  THEN DO;
+18492 +            _NODE_  =                   77;
+18493 +            _LEAF_  =                   22;
+18494 +            P_Total_Actions  =                18106;
+18495 +            V_Total_Actions  =     18179.3636363636;
+18496 +            END;
+18497 +          ELSE DO;
+18498 +            _NODE_  =                   76;
+18499 +            _LEAF_  =                   21;
+18500 +            P_Total_Actions  =     16885.9183673469;
+18501 +            V_Total_Actions  =              16810.2;
+18502 +            END;
+18503 +          END;
+18504 +        END;
+18505 +      ELSE DO;
+18506 +        IF  NOT MISSING(Like_Count ) AND
+18507 +                         12214 <= Like_Count  THEN DO;
+18508 +          IF  NOT MISSING(Retweet_Count ) AND
+18509 +            Retweet_Count  <                 2136 THEN DO;
+18510 +            _NODE_  =                   74;
+18511 +            _LEAF_  =                   19;
+18512 +            P_Total_Actions  =     14740.9756097561;
+18513 +            V_Total_Actions  =     14768.6666666666;
+18514 +            END;
+18515 +          ELSE DO;
+18516 +            _NODE_  =                   75;
+18517 +            _LEAF_  =                   20;
+18518 +            P_Total_Actions  =     15928.8620689655;
+18519 +            V_Total_Actions  =     15902.6153846153;
+18520 +            END;
+18521 +          END;
+18522 +        ELSE DO;
+18523 +          IF  NOT MISSING(Retweet_Count ) AND
+18524 +            Retweet_Count  <               1943.5 THEN DO;
+18525 +            _NODE_  =                   72;
+18526 +            _LEAF_  =                   17;
+18527 +            P_Total_Actions  =            12852.625;
+18528 +            V_Total_Actions  =      12938.909090909;
+18529 +            END;
+18530 +          ELSE DO;
+18531 +            _NODE_  =                   73;
+18532 +            _LEAF_  =                   18;
+18533 +            P_Total_Actions  =      14001.536231884;
+18534 +            V_Total_Actions  =     14223.5416666666;
+18535 +            END;
+18536 +          END;
+18537 +        END;
+18538 +      END;
+18539 +    END;
+18540 +  ELSE DO;
+18541 +    IF  NOT MISSING(Like_Count ) AND
+18542 +                    5354.5 <= Like_Count  THEN DO;
+18543 +      IF  NOT MISSING(Like_Count ) AND
+18544 +                      7849.5 <= Like_Count  THEN DO;
+18545 +        IF  NOT MISSING(Like_Count ) AND
+18546 +                          9086 <= Like_Count  THEN DO;
+18547 +          IF  NOT MISSING(Retweet_Count ) AND
+18548 +                          1738.5 <= Retweet_Count  THEN DO;
+18549 +            _NODE_  =                   71;
+18550 +            _LEAF_  =                   16;
+18551 +            P_Total_Actions  =     12079.9516129032;
+18552 +            V_Total_Actions  =     11995.5714285714;
+18553 +            END;
+18554 +          ELSE DO;
+18555 +            _NODE_  =                   70;
+18556 +            _LEAF_  =                   15;
+18557 +            P_Total_Actions  =     11125.4054054054;
+18558 +            V_Total_Actions  =     11061.3928571428;
+18559 +            END;
+18560 +          END;
+18561 +        ELSE DO;
+18562 +          IF  NOT MISSING(Retweet_Count ) AND
+18563 +                            1714 <= Retweet_Count  THEN DO;
+18564 +            _NODE_  =                   69;
+18565 +            _LEAF_  =                   14;
+18566 +            P_Total_Actions  =     10624.2857142857;
+18567 +            V_Total_Actions  =      10373.923076923;
+18568 +            END;
+18569 +          ELSE DO;
+18570 +            _NODE_  =                   68;
+18571 +            _LEAF_  =                   13;
+18572 +            P_Total_Actions  =     9763.95726495726;
+18573 +            V_Total_Actions  =               9545.2;
+18574 +            END;
+18575 +          END;
+18576 +        END;
+18577 +      ELSE DO;
+18578 +        IF  NOT MISSING(Like_Count ) AND
+18579 +          Like_Count  <               6503.5 THEN DO;
+18580 +          IF  NOT MISSING(Like_Count ) AND
+18581 +                          6042.5 <= Like_Count  THEN DO;
+18582 +            _NODE_  =                   65;
+18583 +            _LEAF_  =                   10;
+18584 +            P_Total_Actions  =     7309.08860759493;
+18585 +            V_Total_Actions  =     7526.45833333333;
+18586 +            END;
+18587 +          ELSE DO;
+18588 +            _NODE_  =                   64;
+18589 +            _LEAF_  =                    9;
+18590 +            P_Total_Actions  =     6633.57272727272;
+18591 +            V_Total_Actions  =     6593.03703703703;
+18592 +            END;
+18593 +          END;
+18594 +        ELSE DO;
+18595 +          IF  NOT MISSING(Like_Count ) AND
+18596 +                          7226.5 <= Like_Count  THEN DO;
+18597 +            _NODE_  =                   67;
+18598 +            _LEAF_  =                   12;
+18599 +            P_Total_Actions  =     8777.48979591836;
+18600 +            V_Total_Actions  =              8906.25;
+18601 +            END;
+18602 +          ELSE DO;
+18603 +            _NODE_  =                   66;
+18604 +            _LEAF_  =                   11;
+18605 +            P_Total_Actions  =     8068.19379844961;
+18606 +            V_Total_Actions  =               7890.5;
+18607 +            END;
+18608 +          END;
+18609 +        END;
+18610 +      END;
+18611 +    ELSE DO;
+18612 +      IF  NOT MISSING(Like_Count ) AND
+18613 +        Like_Count  <               2944.5 THEN DO;
+18614 +        IF  NOT MISSING(Like_Count ) AND
+18615 +          Like_Count  <                 1744 THEN DO;
+18616 +          IF  NOT MISSING(Like_Count ) AND
+18617 +            Like_Count  <                 1003 THEN DO;
+18618 +            _NODE_  =                   56;
+18619 +            _LEAF_  =                    1;
+18620 +            P_Total_Actions  =      681.48623853211;
+18621 +            V_Total_Actions  =     816.085714285714;
+18622 +            END;
+18623 +          ELSE DO;
+18624 +            _NODE_  =                   57;
+18625 +            _LEAF_  =                    2;
+18626 +            P_Total_Actions  =            1606.6625;
+18627 +            V_Total_Actions  =     1590.79245283018;
+18628 +            END;
+18629 +          END;
+18630 +        ELSE DO;
+18631 +          IF  NOT MISSING(Like_Count ) AND
+18632 +            Like_Count  <               2366.5 THEN DO;
+18633 +            _NODE_  =                   58;
+18634 +            _LEAF_  =                    3;
+18635 +            P_Total_Actions  =       2372.700729927;
+18636 +            V_Total_Actions  =           2423.46875;
+18637 +            END;
+18638 +          ELSE DO;
+18639 +            _NODE_  =                   59;
+18640 +            _LEAF_  =                    4;
+18641 +            P_Total_Actions  =     3088.34666666666;
+18642 +            V_Total_Actions  =               3053.5;
+18643 +            END;
+18644 +          END;
+18645 +        END;
+18646 +      ELSE DO;
+18647 +        IF  NOT MISSING(Like_Count ) AND
+18648 +          Like_Count  <               4050.5 THEN DO;
+18649 +          IF  NOT MISSING(Like_Count ) AND
+18650 +            Like_Count  <               3480.5 THEN DO;
+18651 +            _NODE_  =                   60;
+18652 +            _LEAF_  =                    5;
+18653 +            P_Total_Actions  =             3693.928;
+18654 +            V_Total_Actions  =     3687.02222222222;
+18655 +            END;
+18656 +          ELSE DO;
+18657 +            _NODE_  =                   61;
+18658 +            _LEAF_  =                    6;
+18659 +            P_Total_Actions  =     4424.82191780821;
+18660 +            V_Total_Actions  =     4348.74193548387;
+18661 +            END;
+18662 +          END;
+18663 +        ELSE DO;
+18664 +          IF  NOT MISSING(Like_Count ) AND
+18665 +                            4674 <= Like_Count  THEN DO;
+18666 +            _NODE_  =                   63;
+18667 +            _LEAF_  =                    8;
+18668 +            P_Total_Actions  =     5833.82442748091;
+18669 +            V_Total_Actions  =     5768.81818181818;
+18670 +            END;
+18671 +          ELSE DO;
+18672 +            _NODE_  =                   62;
+18673 +            _LEAF_  =                    7;
+18674 +            P_Total_Actions  =     5067.40782122905;
+18675 +            V_Total_Actions  =             5136.825;
+18676 +            END;
+18677 +          END;
+18678 +        END;
+18679 +      END;
+18680 +    END;
+18681 +  END;
+18682 +
+18683 +*****  RESIDUALS R_ *************;
+18684 +IF MISSING( Total_Actions ) THEN R_Total_Actions  = .;
+18685 +ELSE R_Total_Actions  = Total_Actions  - P_Total_Actions ;
+18686 +
+18687 +****************************************************************;
+18688 +******          END OF DECISION TREE SCORING CODE         ******;
+18689 +****************************************************************;
+18690 +
+18691 +drop _LEAF_;
+NOTE: %INCLUDE (level 1) ending.
+18692  run;
+
+NOTE: DATA STEP view saved on file EMWS5.TREE_TEST.
+NOTE: A stored DATA STEP view cannot run under a different operating system.
+NOTE: DATA statement used (Total process time):
+      real time           0.10 seconds
+      cpu time            0.03 seconds
+      
+
+18693  quit;
+18694  filename emflow;
+NOTE: Fileref EMFLOW has been deassigned.
+
+NOTE: View EMWS5.TREE_TRAIN.VIEW used (Total process time):
+      real time           0.03 seconds
+      cpu time            0.04 seconds
+      
+18696  proc sort data=WORK.EM_USER_REPORT;
+18697  by ID VIEW;
+18698  run;
+
+NOTE: There were 132 observations read from the data set WORK.EM_USER_REPORT.
+NOTE: The data set WORK.EM_USER_REPORT has 132 observations and 4 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+      
+
+18699  *------------------------------------------------------------*;
+18700  * Tree: Computing metadata for TRAIN data;
+18701  *------------------------------------------------------------*;
+
+NOTE: View EMWS5.TREE_TRAIN.VIEW used (Total process time):
+      real time           0.03 seconds
+      cpu time            0.03 seconds
+      
+19344  data WORK.MODELTEMP_INFO;
+19345  set EMWS5.Tree_EMINFO;
+19346  where DATA='Tree' and KEY ^in('DECDATA', 'DECMETA', 'IMPORTANCE', 'MODEL');
+19347  run;
+
+NOTE: There were 0 observations read from the data set EMWS5.TREE_EMINFO.
+      WHERE (DATA='Tree') and KEY not in ('DECDATA', 'DECMETA', 'IMPORTANCE', 'MODEL');
+NOTE: The data set WORK.MODELTEMP_INFO has 0 observations and 3 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+      
+
+19348  data EMWS5.Tree_EMINFO;
+19349  length TARGET KEY $32 DATA $43;
+19350  input TARGET KEY DATA $;
+19351  cards;
+
+NOTE: The data set EMWS5.TREE_EMINFO has 3 observations and 3 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.07 seconds
+      cpu time            0.03 seconds
+      
+
+19355  run;
+19356  data EMWS5.Tree_EMINFO;
+19357  set EMWS5.Tree_EMINFO WORK.MODELTEMP_INFO;
+19358  run;
+
+NOTE: There were 3 observations read from the data set EMWS5.TREE_EMINFO.
+NOTE: There were 0 observations read from the data set WORK.MODELTEMP_INFO.
+NOTE: The data set EMWS5.TREE_EMINFO has 3 observations and 3 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.09 seconds
+      cpu time            0.01 seconds
+      
+
+19359  proc sort data = EMWS5.Tree_EMINFO NOTHREADS;
+19360  by TARGET KEY;
+19361  run;
+
+NOTE: There were 3 observations read from the data set EMWS5.TREE_EMINFO.
+NOTE: The data set EMWS5.TREE_EMINFO has 3 observations and 3 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.05 seconds
+      cpu time            0.04 seconds
+      
+
+19362  proc sort data = EMWS5.TextTopic_EMINFO OUT=WORK.SORTEDEMINFO NOTHREADS;
+19363  by TARGET KEY;
+19364  run;
+
+NOTE: There were 8 observations read from the data set EMWS5.TEXTTOPIC_EMINFO.
+NOTE: The data set WORK.SORTEDEMINFO has 8 observations and 3 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.00 seconds
+      
+
+19365  proc sort data = EMWS5.Tree_EMINFO OUT=WORK.TEMP_INFO NOTHREADS;
+19366  by TARGET KEY;
+19367  run;
+
+NOTE: Input data set is already sorted; it has been copied to the output data set.
+NOTE: There were 3 observations read from the data set EMWS5.TREE_EMINFO.
+NOTE: The data set WORK.TEMP_INFO has 3 observations and 3 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+      
+
+19368  data EMWS5.Tree_EMINFO;
+19369  merge WORK.SORTEDEMINFO WORK.TEMP_INFO;
+19370  by TARGET KEY;
+19371  run;
+
+NOTE: There were 8 observations read from the data set WORK.SORTEDEMINFO.
+NOTE: There were 3 observations read from the data set WORK.TEMP_INFO.
+NOTE: The data set EMWS5.TREE_EMINFO has 11 observations and 3 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.04 seconds
+      cpu time            0.03 seconds
+      
+
+19372  proc datasets lib=work nolist;
+19373  delete TEMP_INFO SORTEDEMINFO;
+19374  run;
+
+NOTE: Deleting WORK.TEMP_INFO (memtype=DATA).
+NOTE: Deleting WORK.SORTEDEMINFO (memtype=DATA).
+19375  quit;
+
+NOTE: PROCEDURE DATASETS used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+      
+
+NOTE: View EMWS5.TREE_TRAIN.VIEW used (Total process time):
+      real time           0.03 seconds
+      cpu time            0.03 seconds
+      
+NOTE: View EMWS5.TREE_VALIDATE.VIEW used (Total process time):
+      real time           0.03 seconds
+      cpu time            0.03 seconds
+      
+NOTE: View EMWS5.TREE_TEST.VIEW used (Total process time):
+      real time           0.03 seconds
+      cpu time            0.03 seconds
+      

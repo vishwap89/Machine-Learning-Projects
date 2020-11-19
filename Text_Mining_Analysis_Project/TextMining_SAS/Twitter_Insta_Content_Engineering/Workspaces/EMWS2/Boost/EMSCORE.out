@@ -1,0 +1,29 @@
+ 
+                                                                                                                                                                                                                                                                
+ 
+Variable Importance
+
+Obs    NAME                 LABEL                                  NRULES    IMPORTANCE    VIMPORTANCE     RATIO
+
+  1    Likes_Count          Likes Count                              59        1.00000       1.00000      1.00000
+  2    Comments_Count       Comments Count                           28        0.21048       0.16294      0.77414
+  3    TextCluster_SVD3                                               3        0.03319       0.00980      0.29520
+  4    TextCluster_SVD7                                               1        0.02492       0.00000      0.00000
+  5    TextTopic_raw6       kawhi,+win,game,free,series               2        0.02339       0.00000      0.00000
+  6    TextCluster_SVD28                                              1        0.02151       0.00000      0.00000
+  7    TextTopic_raw8       brkicks,+zion,kingjames,nike,lebron       2        0.02074       0.00000      0.00000
+  8    TextCluster_SVD49                                              2        0.01913       0.00000      0.00000
+  9    TextCluster_SVD44                                              1        0.01858       0.00000      0.00000
+ 10    TextCluster_SVD52                                              1        0.01610       0.00000      0.00000
+ 11    TextCluster_SVD24                                              1        0.01596       0.00000      0.00000
+ 12    TextCluster_SVD19                                              1        0.01451       0.00873      0.60191
+ 13    TextCluster_SVD31                                              2        0.01430       0.00000      0.00000
+ 14    TextCluster_SVD9                                               2        0.01376       0.00000      0.00000
+ 15    TextCluster_SVD48                                              1        0.01324       0.00000      0.00000
+ 16    TextCluster_SVD36                                              2        0.01313       0.00000      0.00000
+ 17    TextCluster_SVD42                                              1        0.01203       0.00000      0.00000
+ 18    TextCluster_SVD6                                               1        0.01094       0.00000      0.00000
+ 19    Character_Count      Character Count                           1        0.00894       0.00000      0.00000
+ 20    TextCluster_SVD46                                              1        0.00891       0.00000      0.00000
+ 21    TextCluster_SVD32                                              1        0.00857       0.00000      0.00000
+ 22    Media_Type           Media Type                                1        0.00619       0.00527      0.85152

@@ -1,0 +1,26 @@
+ 
+                                                                                                                                                                                                                                                                
+ 
+ 
+Variable Summary
+
+          Measurement    Frequency
+Role         Level         Count
+
+ID         NOMINAL           1    
+INPUT      INTERVAL          3    
+INPUT      NOMINAL           2    
+TARGET     INTERVAL          1    
+TEXT       NOMINAL           1    
+ 
+                                                                                                                                                                                                                                                                
+ 
+ 
+Partition Summary
+
+                                     Number of
+Type             Data Set          Observations
+
+DATA        EMWS2.FIMPORT_train        5059    
+TRAIN       EMWS2.Part_TRAIN           4047    
+VALIDATE    EMWS2.Part_VALIDATE        1012    

@@ -1,0 +1,146 @@
+*------------------------------------------------------------*
+User:                vpc19001
+Date:                April 23, 2020
+Time:                10:28:40
+*------------------------------------------------------------*
+* Training Output
+*------------------------------------------------------------*
+ 
+ 
+ 
+ 
+Variable Summary
+ 
+            Measurement    Frequency
+Role           Level         Count
+ 
+ID           NOMINAL            2
+INPUT        INTERVAL          29
+INPUT        NOMINAL            1
+REJECTED     INTERVAL          10
+SEGMENT      BINARY            15
+SEGMENT      NOMINAL            1
+TARGET       INTERVAL           1
+TEXT         NOMINAL            1
+ 
+ 
+ 
+ 
+Predicted and decision variables
+ 
+Type            Variable        Label
+ 
+TARGET       Total_Actions      Total Actions
+PREDICTED    P_Total_Actions    Predicted: Total_Actions
+RESIDUAL     R_Total_Actions    Residual: Total_Actions
+
+
+*------------------------------------------------------------*
+* Score Output
+*------------------------------------------------------------*
+ 
+ 
+ 
+Variable Importance
+ 
+Obs    NAME                 LABEL                               NRULES    IMPORTANCE
+ 
+  1    Retweet_Count        Retweet Count                         34        1.00000
+  2    Like_Count           Like Count                            45        0.75062
+  3    TextCluster_SVD11                                           6        0.05269
+  4    Character_Count      Character Count                        4        0.04376
+  5    TextCluster_SVD7                                            4        0.03887
+  6    TextTopic_raw9       ig,+fan,luka,+back,+winner             3        0.03656
+  7    TextCluster_SVD4                                            2        0.03225
+  8    TextCluster_SVD3                                            1        0.03179
+  9    TextTopic_raw11      +time,first,zion,first time,+big       2        0.02927
+ 10    TextCluster_SVD1                                            3        0.02901
+ 11    TextCluster_SVD9                                            2        0.02683
+ 12    TextTopic_raw4       +year,today,old,+sign,+deal            1        0.02369
+ 13    TextCluster_SVD8                                            1        0.02043
+ 14    TextCluster_SVD5                                            1        0.00938
+
+
+*------------------------------------------------------------*
+* Report Output
+*------------------------------------------------------------*
+ 
+ 
+ 
+ 
+Fit Statistics
+ 
+Target=Total_Actions Target Label=Total Actions
+ 
+   Fit
+Statistics    Statistics Label                            Train
+ 
+  _NOBS_      Sum of Frequencies                        3848.00
+  _SUMW_      Sum of Case Weights Times Freq            3848.00
+  _MAX_       Maximum Absolute Error                  204024.96
+  _SSE_       Sum of Squared Errors             415748353924.48
+  _ASE_       Average Squared Error                108042711.52
+  _RASE_      Root Average Squared Error               10394.36
+  _DIV_       Divisor for ASE                           3848.00
+  _DFT_       Total Degrees of Freedom                  3848.00
+ 
+ 
+ 
+ 
+Assessment Score Rankings
+ 
+Data Role=TRAIN Target Variable=Total_Actions Target Label=Total Actions
+ 
+           Number of       Mean         Mean
+Depth    Observations     Target     Predicted
+ 
+   5          192        53639.01     43236.29
+  10          192        47351.37     42185.62
+  15          193        37661.07     39925.59
+  20          193        21017.55     26346.63
+  25          192        18981.60     24653.01
+  30          192        14948.56     18387.10
+  35          193        11891.42     11890.82
+  40          192        10473.67      9164.57
+  45          194         9053.89      8204.02
+  50          191         8095.21      7574.92
+  55          192         7583.71      7103.20
+  60          193         6427.61      6462.24
+  65          192         5450.06      5602.55
+  70          193         4902.17      4967.50
+  75          192         4191.53      4325.46
+  80          193         3620.44      3681.99
+  85          192         2883.72      3132.03
+  90          193         1989.59      2513.61
+  95          194         1474.44      2037.08
+ 100          190         1444.24      1762.97
+ 
+ 
+ 
+ 
+Assessment Score Distribution
+ 
+Data Role=TRAIN Target Variable=Total_Actions Target Label=Total Actions
+ 
+                            Mean         Mean        Number of       Model
+ Range for Predicted       Target     Predicted    Observations      Score
+ 
+42633.268 -  44801.170    53462.89     43233.19         193        43717.22
+40465.367 -  42633.268    44342.49     41760.68         341        41549.32
+38297.465 -  40465.367    33445.05     40004.14          21        39381.42
+33961.662 -  36129.563    26717.00     34758.40           1        35045.61
+31793.760 -  33961.662    21421.25     32855.46           4        32877.71
+29625.859 -  31793.760    23413.20     30475.79          15        30709.81
+27457.957 -  29625.859    23967.48     28256.55          29        28541.91
+25290.055 -  27457.957    20618.55     26008.87         176        26374.01
+23122.154 -  25290.055    18976.41     24675.85         177        24206.10
+20954.252 -  23122.154    16391.63     22125.68           8        22038.20
+18786.350 -  20954.252    15581.68     19455.25          76        19870.30
+16618.449 -  18786.350    14581.40     17875.38          93        17702.40
+14450.547 -  16618.449    12628.02     15651.45          59        15534.50
+12282.645 -  14450.547    11551.04     13410.12          23        13366.60
+10114.744 -  12282.645    11924.54     10817.18          96        11198.69
+7946.842 -  10114.744     10008.06      8861.57         390         9030.79
+5778.940 -  7946.842       7316.85      6998.87         656         6862.89
+3611.039 -  5778.940       4568.26      4672.66         650         4694.99
+1443.137 -  3611.039       2073.85      2459.62         840         2527.09
